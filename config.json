@@ -1,0 +1,10 @@
+{
+    "video_title": "Military Spending Race (1960-2023)",
+    "wb_indicator": "MS.MIL.XPND.CD",
+    "timeframe": [1960, 2023],
+    "top_n_on_screen": 10,
+    "value_format": "currency",
+    "color_theme": "#7f1d1d",
+    "background_color": "#00B140",
+    "output_filename": "military_spending_race.mp4"
+}
