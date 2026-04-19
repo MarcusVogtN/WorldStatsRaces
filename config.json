@@ -3,7 +3,7 @@
     "value_format": "currency",
     "output_filename": "military_spending_race.mp4",
     "theme": "glass_dark",
-    "preview_timeframe": [1980, 1983],
+    "preview_timeframe": null,
     "source": {
         "type": "world_bank",
         "indicator": "MS.MIL.XPND.CD",
@@ -15,7 +15,7 @@
     },
     "render": {
         "top_n_on_screen": 10,
-        "steps_per_year": 60,
+        "steps_per_year": 21,
         "fps": 30,
         "bitrate": 8000,
         "rank_smooth_window_a": 25,

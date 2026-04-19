@@ -68,7 +68,7 @@ races/
 
 **Fixed-column layout with name-box barrier**: `[name_box][gutter][track]` (see `layout.DEFAULT_COLUMNS`). The name box is a glassmorphic card holding rank + country name; the gutter physically separates it from the flag track so value text can never cross into the name column. `run.py --validate-layout` asserts this and prints pixel bounds.
 
-**Value text placement** (`renderer.update`): value trails left of the flag by default; if the estimated text width would cross `track_left + pad`, it flips to the right of the flag instead. Collisions with the name box are geometrically impossible.
+**Value text placement** (`renderer.update`): value trails left of the flag by default; if the estimated text width would cross `track_left + pad`, it flips to the right of the flag instead. Collisions with the name box are geometrically impossible. The side decision uses the *final* (non-intro-scaled) flag width and font size, so the text lands on the correct side from the first frame and never flips sides while the row bounces in.
 
 **Rounded flag corners** (`renderer._round_image_corners`): applies a radial alpha mask to each RGBA flag (cached per country). `flag_corner_radius_frac` is a fraction of the flag's short side.
 
@@ -90,6 +90,8 @@ races/
 
 **DISPLAY_NAMES** (`util.py`): overrides for verbose World Bank country names (`"Russian Federation"` → `"Russia"`). Add entries for new countries that exceed 22 chars.
 
-**Themes** (`render/theme.py`): swap visual style via config. `GLASS_DARK` uses a vertical gradient background plus glassy translucent cards; `FLAT_LIGHT` is a minimal light-mode alternative.
+**Themes** (`render/theme.py`): swap visual style via config. `GLASS_DARK` uses a radial vignette background (lighter center fading to pure black at the edges) plus glassy translucent cards; `FLAT_LIGHT` is a minimal light-mode alternative. The background spec supports three forms: solid hex (`"#..."`), `("gradient", c_top, c_bottom)` vertical gradient, or `("radial", c_center, c_edge)` elliptical vignette.
+
+**Intro animations** (`renderer._draw_title_year_trend` + `renderer.update`): three elements share a single back-ease-out bounce (overshoot then settle) driven by `t_title` (frames/18). (1) Main title scales in around its center. (2) Each flag-race row scales vertically via `race_intro_scale` applied to `card_h_i`, which cascades to flag size and font sizes — y-centers stay anchored so rows grow in place rather than sliding. (3) Total trend line scales vertically around `plot_y0` (baseline), with the current-position dot, vertical guide, and floating year-above-dot label all following the pop. The trend line also keeps a separate left-to-right draw-in sweep driven by `t_draw`. The main title, the `TREND:` header row, the live total, and all trend-line elements render at full opacity — no alpha fade-in. Only the bottom source-credit line keeps the legacy `t_ease` alpha fade.
 
 **Plugin seams**: add a new data source by subclassing `DataSource` and registering it in `races/sources/__init__.py::REGISTRY`. Add a new asset provider by subclassing `AssetProvider` and registering it. The renderer only calls `load_icon(name)` → RGBA or None, so it's source-agnostic.

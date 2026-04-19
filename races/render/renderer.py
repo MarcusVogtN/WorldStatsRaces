@@ -156,12 +156,12 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
     title_scale = 0.35 + title_scale * 0.65
 
     title_cx = 0.5
-    title_cy = 0.935
+    title_cy = 0.915
 
     ax.text(title_cx, title_cy, main.upper(),
             transform=ax.transAxes, ha='center', va='center',
             color=theme.text_primary, fontsize=44 * title_scale, fontweight='bold',
-            alpha=alpha, fontfamily=theme.font_family, zorder=3)
+            alpha=1.0, fontfamily=theme.font_family, zorder=3)
 
     # Header row above the trend line: label card (left) + year card (right).
     if trend_series is None:
@@ -193,18 +193,18 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
     ax.text(label_x, label_y, prefix,
             transform=ax.transAxes, ha='left', va='center',
             color=theme.text_secondary, fontsize=16, fontweight='black',
-            alpha=alpha * 0.9, fontfamily=theme.font_family, zorder=3)
+            alpha=0.9, fontfamily=theme.font_family, zorder=3)
     ax.text(label_x + 0.095, label_y, trend_label.upper(),
             transform=ax.transAxes, ha='left', va='center',
             color=theme.text_primary, fontsize=21, fontweight='black',
-            alpha=alpha, fontfamily=theme.font_family, zorder=3)
+            alpha=1.0, fontfamily=theme.font_family, zorder=3)
 
     # Live total on the right side of the header row.
     if total_value is not None and np.isfinite(total_value):
         ax.text(0.930, label_y, format_value(float(total_value), value_format).upper(),
                 transform=ax.transAxes, ha='right', va='center',
                 color=theme.text_primary, fontsize=26, fontweight='black',
-                alpha=alpha, fontfamily=theme.font_family, zorder=3)
+                alpha=1.0, fontfamily=theme.font_family, zorder=3)
 
     # Trend line — wide, no background card. Sits closer to the flag race;
     # the TREND header above stays in place.
@@ -234,7 +234,7 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
     line_y_pop = plot_y0 + (line_y - plot_y0) * trend_pop
     ax.plot(line_x[:draw_end], line_y_pop[:draw_end],
             color=theme.text_primary, linewidth=1.6,
-            alpha=alpha * 0.75, zorder=3, solid_capstyle='round')
+            alpha=0.75, zorder=3, solid_capstyle='round')
 
     # Current-position indicator
     if trend_pos is not None:
@@ -246,10 +246,10 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
         # Vertical guide
         ax.plot([dot_x, dot_x], [plot_y0, guide_top],
                 color=theme.text_primary, linewidth=1.0,
-                alpha=alpha * 0.35, zorder=3)
+                alpha=0.35, zorder=3)
         ax.plot([dot_x], [dot_y], marker='o', markersize=7,
                 color=theme.text_primary, markeredgewidth=0,
-                alpha=alpha, zorder=4)
+                alpha=1.0, zorder=4)
 
         # Current year follows the indicator, sitting just above the trend plot.
         edge_pad = 0.05
@@ -262,18 +262,18 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
         ax.text(dot_x, guide_top + 0.008, str(year_int),
                 transform=ax.transAxes, ha=year_ha, va='bottom',
                 color=theme.text_primary, fontsize=24, fontweight='bold',
-                alpha=alpha, fontfamily=theme.font_family, zorder=4)
+                alpha=1.0, fontfamily=theme.font_family, zorder=4)
 
     if start_year is not None:
         ax.text(plot_x0, plot_y0 - 0.012, str(start_year),
                 transform=ax.transAxes, ha='left', va='top',
                 color=theme.text_secondary, fontsize=17, fontweight='bold',
-                alpha=alpha * 0.85, fontfamily=theme.font_family, zorder=3)
+                alpha=0.85, fontfamily=theme.font_family, zorder=3)
     if end_year is not None:
         ax.text(plot_x1, plot_y0 - 0.012, str(end_year),
                 transform=ax.transAxes, ha='right', va='top',
                 color=theme.text_secondary, fontsize=17, fontweight='bold',
-                alpha=alpha * 0.85, fontfamily=theme.font_family, zorder=3)
+                alpha=0.85, fontfamily=theme.font_family, zorder=3)
 
 
 def _weighted_row_position(display_rank_target: float,
@@ -586,12 +586,25 @@ def render(data: pd.DataFrame,
                 value_fs = _lerp(14, 24, s)
                 value_str = format_value(value, value_format).upper()
                 gap = 0.012
-                trailing_x = fx - gap
-                approx_text_w = len(value_str) * (value_fs * 0.68 / FIG_W_PX)
-                trailing_left = trailing_x - approx_text_w
                 min_allowed_left = columns.track_left + 0.025
 
-                if trailing_left >= min_allowed_left:
+                # Decide the side using the *final* (non-intro-scaled) geometry so the
+                # value text doesn't flip sides as the row scales up during intro.
+                draw_h_final = (card_h_i / race_intro_scale) * 0.96 if race_intro_scale > 0 else draw_h
+                draw_w_final = draw_h_final * (iw / ih) * (FIG_H_PX / FIG_W_PX)
+                fx_final = track_position(
+                    value, max_val,
+                    columns.track_left, columns.track_right,
+                    draw_w_final,
+                )
+                s_final = (card_h_i / race_intro_scale) / max_card_h_render if (
+                    race_intro_scale > 0 and max_card_h_render > 0) else s
+                value_fs_final = _lerp(14, 24, s_final)
+                approx_text_w_final = len(value_str) * (value_fs_final * 0.68 / FIG_W_PX)
+                place_left = (fx_final - gap - approx_text_w_final) >= min_allowed_left
+
+                trailing_x = fx - gap
+                if place_left:
                     ax.text(trailing_x, y_center, value_str,
                             ha='right', va='center',
                             color=theme.text_primary,
