@@ -1,0 +1,25 @@
+{
+  "_comment": "Curated all-time top scorers. fbref_id is resolved on first run via search and persisted back here. Add names freely; leave fbref_id null to auto-resolve. Disambiguation happens manually when search returns multiple exact-name matches.",
+  "players": [
+    {"display_name": "Lionel Messi",              "fbref_id": "d70ce98e", "fbref_slug": "Lionel-Messi"},
+    {"display_name": "Cristiano Ronaldo",         "fbref_id": "dea698d9", "fbref_slug": "Cristiano-Ronaldo"},
+    {"display_name": "Robert Lewandowski",        "fbref_id": "8d78e732", "fbref_slug": "Robert-Lewandowski"},
+    {"display_name": "Karim Benzema",             "fbref_id": "70d74ece", "fbref_slug": "Karim-Benzema"},
+    {"display_name": "Luis Suarez",               "fbref_id": "a6154613", "fbref_slug": "Luis-Suarez"},
+    {"display_name": "Zlatan Ibrahimovic",        "fbref_id": "4cde5509", "fbref_slug": "Zlatan-Ibrahimovic"},
+    {"display_name": "Sergio Aguero",             "fbref_id": "4d034881", "fbref_slug": "Sergio-Aguero"},
+    {"display_name": "Harry Kane",                "fbref_id": "21a66f6a", "fbref_slug": "Harry-Kane"},
+    {"display_name": "Thomas Muller",             "fbref_id": "3c6089ab", "fbref_slug": "Thomas-Muller"},
+    {"display_name": "Mohamed Salah",             "fbref_id": "e342ad68", "fbref_slug": "Mohamed-Salah"},
+    {"display_name": "Erling Haaland",            "fbref_id": "1f44ac21", "fbref_slug": "Erling-Haaland"},
+    {"display_name": "Kylian Mbappe",             "fbref_id": "42fd9c7f", "fbref_slug": "Kylian-Mbappe"},
+    {"display_name": "Wayne Rooney",              "fbref_id": "f07be45a", "fbref_slug": "Wayne-Rooney"},
+    {"display_name": "Edinson Cavani",            "fbref_id": "527f063d", "fbref_slug": "Edinson-Cavani"},
+    {"display_name": "Pierre-Emerick Aubameyang", "fbref_id": "d5dd5f1f", "fbref_slug": "Pierre-Emerick-Aubameyang"},
+    {"display_name": "Gonzalo Higuain",           "fbref_id": "8a08491a", "fbref_slug": "Gonzalo-Higuain"},
+    {"display_name": "Romelu Lukaku",             "fbref_id": "5eae500a", "fbref_slug": "Romelu-Lukaku"},
+    {"display_name": "Ciro Immobile",             "fbref_id": "4431aed2", "fbref_slug": "Ciro-Immobile"},
+    {"display_name": "Antoine Griezmann",         "fbref_id": "df69b544", "fbref_slug": "Antoine-Griezmann"},
+    {"display_name": "Neymar",                    "fbref_id": "69384e5d", "fbref_slug": "Neymar"}
+  ]
+}
