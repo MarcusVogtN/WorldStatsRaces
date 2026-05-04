@@ -43,7 +43,11 @@ def interpolate_and_rank(df: pd.DataFrame, steps_per_year: int,
                             (len(df) - 1) * steps_per_year + 1)
     scores = df.reindex(new_index).interpolate(method='linear')
     smoothed = scores.rolling(window=smooth_win_a, center=True, min_periods=1).mean()
-    ranks = smoothed.rank(axis=1, method='first', ascending=True).astype(float)
+    # Fill NaN with 0 before ranking so pre-debut entities (e.g. football
+    # players with sparse career windows) get the lowest ranks instead of
+    # NaN ranks. WB data has values for every country every year so this is
+    # a no-op for the legacy path; sport datasets need it to render at all.
+    ranks = smoothed.fillna(0).rank(axis=1, method='first', ascending=True).astype(float)
     ranks = ranks.rolling(window=smooth_win_b, center=True, min_periods=1).mean()
     return scores, ranks
 

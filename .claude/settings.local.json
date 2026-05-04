@@ -4,7 +4,9 @@
       "Bash(python:*)",
       "Bash(python3:*)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(awk *)",
+      "Bash(/c/Python314/python.exe)"
     ]
   }
 }

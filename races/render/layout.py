@@ -115,3 +115,53 @@ def track_position(value: float, max_value: float,
 def smoothstep(t: float) -> float:
     t = float(np.clip(t, 0.0, 1.0))
     return t * t * (3 - 2 * t)
+
+
+# Auto-name-box sizing — used by both pipelines so long-name datasets
+# (footballer rosters, full country names) don't get truncated unnecessarily.
+_NAME_FS_MAX = 21.0
+_CHAR_W_FRAC = _NAME_FS_MAX * 0.82 / 1080.0
+_NAME_BOX_LEFT = 0.040
+_NAME_LEFT = 0.100
+_RANK_X = 0.085
+_TRACK_RIGHT = 0.820
+_GUTTER = 0.020
+_NAME_BOX_RIGHT_PAD = 0.018
+_NAME_BOX_MIN_RIGHT = 0.310
+_NAME_BOX_MAX_RIGHT = 0.530
+
+
+def auto_size_columns(data, top_n_on_screen: int) -> tuple[Columns, int]:
+    """Pick name-box width to fit the longest entity that ever lands in top-N.
+
+    Walks every row of `data`, takes that row's top-N entities, unions the set,
+    and sizes `name_box_right` to fit the longest. Returns (columns, name_max_chars)
+    where `name_max_chars` is the cap fed back into `render_cfg` so the
+    renderer's `..` truncation only kicks in for genuine outliers.
+    """
+    seen: set[str] = set()
+    for _, row in data.iterrows():
+        top = row.dropna().sort_values(ascending=False).head(top_n_on_screen)
+        seen.update(map(str, top.index))
+
+    longest = max((len(name) for name in seen), default=0)
+    needed_right = _NAME_LEFT + longest * _CHAR_W_FRAC + _NAME_BOX_RIGHT_PAD
+    name_box_right = max(_NAME_BOX_MIN_RIGHT,
+                         min(_NAME_BOX_MAX_RIGHT, needed_right))
+    chars_that_fit = int((name_box_right - _NAME_LEFT - _NAME_BOX_RIGHT_PAD)
+                         / _CHAR_W_FRAC)
+    name_max_chars = max(longest, chars_that_fit)
+
+    longest_name = max(seen, key=len) if seen else ''
+    print(f"[layout] {len(seen)} ever-top-{top_n_on_screen} entities · "
+          f"longest name: '{longest_name}' ({longest} chars) · "
+          f"name_box_right={name_box_right:.3f} · name_max_chars={name_max_chars}")
+
+    return Columns(
+        rank_x=_RANK_X,
+        name_left=_NAME_LEFT,
+        name_box_left=_NAME_BOX_LEFT,
+        name_box_right=name_box_right,
+        track_left=name_box_right + _GUTTER,
+        track_right=_TRACK_RIGHT,
+    ), name_max_chars

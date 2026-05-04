@@ -215,10 +215,53 @@ def build_stat_pack(scores_df: pd.DataFrame,
     else:
         early_boring = None
 
+    # ── Final-year standings (top-N) ────────────────────────────────────
+    # Authoritative final value per country — the LLM MUST quote these when
+    # writing the payoff line. Pull from scores_df endpoints directly, NOT
+    # from `yearly` — `_yearly_from_scores` keeps the first sub-frame per
+    # rounded integer year, which for year Y lands at the float midpoint
+    # between Y-1 and Y (≈ Y-0.5) and so reports a linearly-interpolated
+    # mid-year value, not the true year-end. For the payoff line we want
+    # the exact year-end value, so use scores_df.iloc[-1].
+    final_year = int(round(float(scores_df.index[-1])))
+    final_row = scores_df.iloc[-1].dropna().sort_values(ascending=False)
+    final_standings: list[dict[str, Any]] = []
+    for rank_idx, (country, value) in enumerate(final_row.head(n_on_screen).items(), start=1):
+        final_standings.append({
+            'rank': rank_idx,
+            'country': display_name(country),
+            'year': final_year,
+            'value': float(value),
+            'value_str': format_value(float(value), value_format),
+        })
+
+    # ── First-year standings (top-N) ────────────────────────────────────
+    first_year = int(round(float(scores_df.index[0])))
+    first_row = scores_df.iloc[0].dropna().sort_values(ascending=False)
+    first_standings: list[dict[str, Any]] = []
+    for rank_idx, (country, value) in enumerate(first_row.head(n_on_screen).items(), start=1):
+        first_standings.append({
+            'rank': rank_idx,
+            'country': display_name(country),
+            'year': first_year,
+            'value': float(value),
+            'value_str': format_value(float(value), value_format),
+        })
+
+    # ── Countries that ever appear in the data ──────────────────────────
+    # Hard whitelist for the LLM: it MAY NOT mention any entity not in this
+    # list (in particular: no USSR / Soviet Union / Yugoslavia / East
+    # Germany — the World Bank dataset has none of those).
+    ever_present = sorted({display_name(c) for c in countries
+                           if yearly[c].notna().any()})
+
     return {
         'video_title': video_title,
         'years': [int(years[0]), int(years[-1])],
         'value_format': value_format,
+        'countries_in_data': ever_present,
+        'first_standings': first_standings,
+        'final_standings': final_standings,
         'top_share_per_decade': top_share_per_decade,
         'total_growth': total_growth,
         'longest_reign_at_1': longest_reign,

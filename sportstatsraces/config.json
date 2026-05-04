@@ -1,0 +1,39 @@
+{
+  "video_title": "PL ALL-TIME TOP SCORERS",
+  "value_format": "goals",
+  "output_filename": "pl_all_time_goals.mp4",
+  "theme": "glass_dark_black",
+  "preview_timeframe": null,
+  "source": {
+    "type": "fbref_pl",
+    "parquet_path": "cache/fbref/pl_career_goals.parquet",
+    "meta_path": "cache/fbref/pl_player_meta.json",
+    "timeframe": [1993, 2026],
+    "top_n_keep": 200
+  },
+  "assets": {
+    "type": "headshots",
+    "headshots_src_dir": "cache/fbref/headshots"
+  },
+  "render": {
+    "top_n_on_screen": 10,
+    "steps_per_year": 60,
+    "fps": 30,
+    "bitrate": 8000,
+    "rank_smooth_window_a": 25,
+    "rank_smooth_window_b": 35,
+    "row_min_weight": 0.45,
+    "flag_corner_radius_frac": 0.08,
+    "trend_label": "Total PL goals",
+    "show_total_trend": false,
+    "race_top": 0.80,
+    "race_bottom": 0.10,
+    "spotlight": {"enabled": false},
+    "show_row_rate": true,
+    "show_retirement": true,
+    "row_rate_window_years": 1.0,
+    "row_rate_label": "/SZN",
+    "row_retired_label": "RETIRED",
+    "font_scale": 1.0
+  }
+}

@@ -36,14 +36,9 @@ SAFE_BOTTOM = 0.08   # just enough clearance for the source-credit line
 
 
 def _draw_background(ax, theme: Theme, *, frame_idx: int = 0, fps: int = 30,
-                     tension: float = 0.0, anim_cfg: dict | None = None,
-                     cache: dict | None = None):
+                     n_frames_total: int = 1,
+                     drift_period_frames: int | None = None):
     bg = theme.background
-    if isinstance(bg, tuple) and bg[0] == 'lava':
-        _draw_lava_background(ax, bg, frame_idx=frame_idx, fps=fps,
-                              tension=tension, anim_cfg=anim_cfg or {},
-                              cache=cache if cache is not None else {})
-        return
     if isinstance(bg, tuple) and bg[0] == 'gradient':
         _, c_top, c_bottom = bg
         top_rgb = np.array(_hex_to_rgb(c_top))
@@ -53,10 +48,27 @@ def _draw_background(ax, theme: Theme, *, frame_idx: int = 0, fps: int = 30,
         img = np.flipud(img)
         ax.imshow(img, extent=[0, 1, 0, 1], aspect='auto', zorder=-10,
                   origin='upper', interpolation='bilinear')
-    elif isinstance(bg, tuple) and bg[0] == 'radial':
-        # ('radial', c_center, c_edge) — lighter center fading to dark edges.
-        _, c_center, c_edge = bg
-        center_rgb = np.array(_hex_to_rgb(c_center))
+    elif isinstance(bg, tuple) and bg[0] in ('radial', 'radial_drift'):
+        # 'radial':       ('radial', c_center, c_edge)
+        # 'radial_drift': ('radial_drift', [c_1, c_2, ...], c_edge) — center
+        #                 color smoothly cycles across the run; edge is fixed.
+        if bg[0] == 'radial':
+            _, c_center, c_edge = bg
+            center_rgb = np.array(_hex_to_rgb(c_center))
+        else:
+            _, palette, c_edge = bg
+            n = max(1, len(palette))
+            # Period in frames: defaults to one full cycle across the video.
+            period = drift_period_frames if drift_period_frames else max(1, n_frames_total)
+            pos = (frame_idx / max(1, period)) * n
+            i = int(pos) % n
+            j = (i + 1) % n
+            t_blend = pos - int(pos)
+            # smoothstep so the transition between hues is non-linear.
+            t_blend = t_blend * t_blend * (3 - 2 * t_blend)
+            a = np.array(_hex_to_rgb(palette[i]))
+            b = np.array(_hex_to_rgb(palette[j]))
+            center_rgb = a * (1 - t_blend) + b * t_blend
         edge_rgb = np.array(_hex_to_rgb(c_edge))
         h, w = 540, 960  # 16:9 sampling; bilinear handles upscale
         yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -77,67 +89,6 @@ def _draw_background(ax, theme: Theme, *, frame_idx: int = 0, fps: int = 30,
 def _hex_to_rgb(hx: str) -> tuple:
     hx = hx.lstrip('#')
     return tuple(int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4))
-
-
-def _draw_lava_background(ax, bg: tuple, *, frame_idx: int, fps: int,
-                          tension: float, anim_cfg: dict, cache: dict):
-    """Animated 'blurred lava lamp' background with tension-driven brightness.
-
-    Canvas regens every `regen_every` frames for speed; blob motion is smooth
-    because canvas regen cadence is unrelated to the visible smoothness of a
-    heavily-blurred image.
-    """
-    _, c_center, c_edge, c_blob = bg
-    blob_count = int(anim_cfg.get('blob_count', 4))
-    base_period = float(anim_cfg.get('base_period_seconds', 18.0))
-    pulse_gain = float(anim_cfg.get('pulse_gain', 0.45))
-    regen_every = int(anim_cfg.get('regen_every_frames', 6))
-
-    key = frame_idx // max(1, regen_every)
-    if cache.get('key') == key and 'img' in cache:
-        ax.imshow(cache['img'], extent=[0, 1, 0, 1], aspect='auto', zorder=-10,
-                  origin='upper', interpolation='bilinear')
-        return
-
-    center_rgb = np.array(_hex_to_rgb(c_center))
-    edge_rgb = np.array(_hex_to_rgb(c_edge))
-    blob_rgb = np.array(_hex_to_rgb(c_blob))
-
-    h, w = 135, 240  # coarse; bilinear upscale handles smoothing
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
-    nx = (xx - (w - 1) / 2) / ((w - 1) / 2)
-    ny = (yy - (h - 1) / 2) / ((h - 1) / 2)
-    dist = np.sqrt(nx * nx + ny * ny)
-    t_radial = np.clip(dist / 1.25, 0.0, 1.0)
-    t_radial = t_radial * t_radial * (3 - 2 * t_radial)
-    base = center_rgb[None, None, :] * (1 - t_radial[:, :, None]) + \
-        edge_rgb[None, None, :] * t_radial[:, :, None]
-
-    t_sec = frame_idx / max(1, fps)
-    blob_field = np.zeros((h, w), dtype=np.float32)
-    for i in range(blob_count):
-        period = base_period * (0.78 + 0.22 * i)
-        phase_x = i * 1.37
-        phase_y = i * 2.11
-        # Drift center in axes-fraction space [-0.55, 0.55].
-        cx = 0.5 + 0.55 * np.sin(2 * np.pi * t_sec / period + phase_x)
-        cy = 0.5 + 0.55 * np.cos(2 * np.pi * t_sec / period * 0.81 + phase_y)
-        px = (xx / (w - 1)) - cx
-        py = (yy / (h - 1)) - cy
-        r2 = px * px + py * py
-        sigma2 = 0.12  # ~radius 0.35
-        blob_field += np.exp(-r2 / sigma2)
-
-    blob_field /= max(1.0, blob_count * 0.9)  # keep in [0, ~1]
-    intensity = 0.55 + pulse_gain * float(np.clip(tension, 0.0, 1.0))
-    blob_alpha = np.clip(blob_field * intensity, 0.0, 0.85)[:, :, None]
-    img = base * (1 - blob_alpha) + blob_rgb[None, None, :] * blob_alpha
-    img = np.clip(img, 0.0, 1.0)
-
-    cache['key'] = key
-    cache['img'] = img
-    ax.imshow(img, extent=[0, 1, 0, 1], aspect='auto', zorder=-10,
-              origin='upper', interpolation='bilinear')
 
 
 def _rounded_rect(ax, x, y, w, h, *, radius_px, fig_w_px, facecolor, alpha,
@@ -196,7 +147,12 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                             t_title: float = 1.0,
                             t_draw: float = 1.0,
                             total_value: Optional[float] = None,
-                            value_format: str = ''):
+                            value_format: str = '',
+                            value_suffix: str = '',
+                            title_scale_fs: float = 1.0,
+                            title_weight='bold',
+                            header_scale_fs: float = 1.0,
+                            header_weight='black'):
     """Title card + (label-card | year-card) row + wide borderless trend line."""
     if ' (' in title:
         main = title.split(' (', 1)[0]
@@ -218,7 +174,8 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
 
     ax.text(title_cx, title_cy, main.upper(),
             transform=ax.transAxes, ha='center', va='center',
-            color=theme.text_primary, fontsize=44 * title_scale, fontweight='bold',
+            color=theme.text_primary,
+            fontsize=44 * title_scale * title_scale_fs, fontweight=title_weight,
             alpha=1.0, fontfamily=theme.font_family, zorder=3)
 
     # Header row above the trend line: label card (left) + year card (right).
@@ -237,7 +194,8 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
             )
         ax.text(0.5, year_card_y + year_card_h / 2, str(year_int),
                 transform=ax.transAxes, ha='center', va='center',
-                color=theme.text_primary, fontsize=52, fontweight='bold',
+                color=theme.text_primary,
+                fontsize=52 * header_scale_fs, fontweight=header_weight,
                 alpha=alpha, fontfamily=theme.font_family, zorder=3)
         return
 
@@ -254,18 +212,21 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
     header_scale = max(title_scale, 1e-3)
     ax.text(label_x, label_y, prefix,
             transform=ax.transAxes, ha='left', va='center',
-            color=theme.text_secondary, fontsize=16 * header_scale, fontweight='black',
+            color=theme.text_secondary,
+            fontsize=16 * header_scale * header_scale_fs, fontweight=header_weight,
             alpha=0.9, fontfamily=theme.font_family, zorder=3)
     ax.text(label_x + 0.095, label_y, trend_label.upper(),
             transform=ax.transAxes, ha='left', va='center',
-            color=theme.text_primary, fontsize=21 * header_scale, fontweight='black',
+            color=theme.text_primary,
+            fontsize=21 * header_scale * header_scale_fs, fontweight=header_weight,
             alpha=1.0, fontfamily=theme.font_family, zorder=3)
 
     # Live total on the right side of the header row.
     if total_value is not None and np.isfinite(total_value):
-        ax.text(0.930, label_y, format_value(float(total_value), value_format).upper(),
+        ax.text(0.930, label_y, format_value(float(total_value), value_format).upper() + (' ' + value_suffix if value_suffix else ''),
                 transform=ax.transAxes, ha='right', va='center',
-                color=theme.text_primary, fontsize=26 * header_scale, fontweight='black',
+                color=theme.text_primary,
+                fontsize=26 * header_scale * header_scale_fs, fontweight=header_weight,
                 alpha=1.0, fontfamily=theme.font_family, zorder=3)
 
     # Trend line — wide, no background card. Sits closer to the flag race;
@@ -318,24 +279,26 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
         # snapped visibly), use ha='left' with a clamped x so the text
         # visually centers over dot_x but slides to stay inside [plot_x0, plot_x1].
         year_str = str(year_int)
-        year_fs = 24
+        year_fs = 24 * header_scale_fs
         year_text_w = len(year_str) * year_fs * 0.68 / FIG_W_PX
         year_x = dot_x - year_text_w / 2
         year_x = max(plot_x0, min(plot_x1 - year_text_w, year_x))
         ax.text(year_x, guide_top + 0.008, year_str,
                 transform=ax.transAxes, ha='left', va='bottom',
-                color=theme.text_primary, fontsize=year_fs, fontweight='bold',
+                color=theme.text_primary, fontsize=year_fs, fontweight=header_weight,
                 alpha=1.0, fontfamily=theme.font_family, zorder=4)
 
     if start_year is not None:
         ax.text(plot_x0, plot_y0 - 0.012, str(start_year),
                 transform=ax.transAxes, ha='left', va='top',
-                color=theme.text_secondary, fontsize=17, fontweight='bold',
+                color=theme.text_secondary,
+                fontsize=17 * header_scale_fs, fontweight=header_weight,
                 alpha=0.85, fontfamily=theme.font_family, zorder=3)
     if end_year is not None:
         ax.text(plot_x1, plot_y0 - 0.012, str(end_year),
                 transform=ax.transAxes, ha='right', va='top',
-                color=theme.text_secondary, fontsize=17, fontweight='bold',
+                color=theme.text_secondary,
+                fontsize=17 * header_scale_fs, fontweight=header_weight,
                 alpha=0.85, fontfamily=theme.font_family, zorder=3)
 
 
@@ -351,7 +314,9 @@ SPOTLIGHT_H = 0.140
 
 def _draw_spotlight(ax, theme: Theme, *, country: str, display_name_str: str,
                     rank_int: int, value: float, icon, alpha: float,
-                    label_text: str, subtext: str, value_format: str):
+                    label_text: str, subtext: str, value_format: str,
+                    spot_scale_fs: float = 1.0,
+                    spot_weight=1000):
     """Vertical stack: banner, name, [subtext], centered flag, value. Rank pinned top-right."""
     if alpha <= 0.0:
         return
@@ -371,43 +336,48 @@ def _draw_spotlight(ax, theme: Theme, *, country: str, display_name_str: str,
     cx = x + w / 2
 
     # Banner (top)
-    banner_h = 0.020
+    banner_h = 0.026
     banner_y = y + h - banner_h - pad * 0.2
     ax.text(cx, banner_y + banner_h / 2, label_text,
             transform=ax.transAxes, ha='center', va='center',
-            color=theme.text_secondary, fontsize=9, fontweight='black',
+            color=theme.text_secondary,
+            fontsize=14 * spot_scale_fs, fontweight=spot_weight,
             alpha=0.9 * alpha, fontfamily=theme.font_family, zorder=5)
 
     # Rank pinned to top-right of card.
     ax.text(x + w - pad, banner_y + banner_h / 2, f'#{rank_int}',
             transform=ax.transAxes, ha='right', va='center',
-            color=theme.text_primary, fontsize=12, fontweight='black',
+            color=theme.text_primary,
+            fontsize=18 * spot_scale_fs, fontweight=spot_weight,
             alpha=alpha, fontfamily=theme.font_family, zorder=5)
 
     # Name (centered, directly under banner).
     name_label = display_name_str.upper()
     if len(name_label) > 16:
         name_label = name_label[:15] + '…'
-    name_y = banner_y - 0.006
+    name_y = banner_y - 0.010
     ax.text(cx, name_y, name_label,
             transform=ax.transAxes, ha='center', va='top',
-            color=theme.text_primary, fontsize=13, fontweight='black',
+            color=theme.text_primary,
+            fontsize=20 * spot_scale_fs, fontweight=spot_weight,
             alpha=alpha, fontfamily=theme.font_family, zorder=5)
 
     # Subtext (optional, under name).
     has_subtext = bool(subtext)
-    subtext_y = name_y - 0.018
+    subtext_y = name_y - 0.024
     if has_subtext:
         ax.text(cx, subtext_y, subtext.upper(),
                 transform=ax.transAxes, ha='center', va='top',
-                color=theme.text_secondary, fontsize=9, fontweight='bold',
+                color=theme.text_secondary,
+                fontsize=14 * spot_scale_fs, fontweight=spot_weight,
                 alpha=0.9 * alpha, fontfamily=theme.font_family, zorder=5)
 
     # Value (bottom, centered).
     value_y = y + pad * 0.4 + 0.002
     ax.text(cx, value_y, format_value(value, value_format).upper(),
             transform=ax.transAxes, ha='center', va='bottom',
-            color=theme.text_primary, fontsize=15, fontweight='black',
+            color=theme.text_primary,
+            fontsize=22 * spot_scale_fs, fontweight=spot_weight,
             alpha=alpha, fontfamily=theme.font_family, zorder=5)
 
     # Flag centered between name/subtext and value.
@@ -468,7 +438,11 @@ def render(data: pd.DataFrame,
            output_path: Path,
            render_cfg: dict,
            columns: Columns = DEFAULT_COLUMNS,
-           preview_timeframe: Optional[tuple] = None) -> None:
+           preview_timeframe: Optional[tuple] = None,
+           single_frame_year: Optional[float] = None,
+           single_frame_png_path: Optional[Path] = None,
+           single_frame_years: Optional[list] = None,
+           single_frames_dir: Optional[Path] = None) -> None:
 
     n_on_screen = render_cfg.get('top_n_on_screen', 10)
     steps_per_year = render_cfg.get('steps_per_year', 60)
@@ -480,7 +454,18 @@ def render(data: pd.DataFrame,
     show_total_trend = render_cfg.get('show_total_trend', True)
     trend_label = render_cfg.get('trend_label', 'Total — all countries')
     flag_corner_radius_frac = render_cfg.get('flag_corner_radius_frac', 0.14)
+    value_suffix = str(render_cfg.get('value_suffix', '') or '')
     row_gap = render_cfg.get('row_gap', 0.008)
+    name_max_chars = int(render_cfg.get('name_max_chars', 22))
+    show_row_rate = bool(render_cfg.get('show_row_rate', False))
+    show_retirement = bool(render_cfg.get('show_retirement', False))
+    row_rate_window_years = float(render_cfg.get('row_rate_window_years', 1.0))
+    row_rate_label = str(render_cfg.get('row_rate_label', '/SZN'))
+    row_retired_label = str(render_cfg.get('row_retired_label', 'RETIRED'))
+    # How many seasons of zero growth before flagging retirement. Guards
+    # against marking still-active entities whose interpolated current season
+    # happens to be flat at the very end of the dataset.
+    row_retired_dead_seasons = float(render_cfg.get('row_retired_dead_seasons', 1.5))
 
     race_top = render_cfg.get('race_top', 0.72 if show_total_trend else 0.78)
     race_bottom = render_cfg.get('race_bottom', 0.11)
@@ -496,27 +481,73 @@ def render(data: pd.DataFrame,
     scores_df, ranks_df = interpolate_and_rank(data, steps_per_year, smooth_a, smooth_b)
     country_colors = assign_colors(data.columns, theme.accent_palette)
 
-    # ── Background animation (lava-lamp + tension pulse) ─────────────────
-    bg_anim_cfg = render_cfg.get('background_animation', {}) or {}
-    bg_anim_enabled = bool(bg_anim_cfg.get('enabled', False)) and \
-        isinstance(theme.background, tuple) and theme.background[0] == 'lava'
-    _bg_cache: dict = {}
-    if bg_anim_enabled:
-        rank_mat = ranks_df.to_numpy(dtype=np.float32)
-        drank = np.abs(np.diff(rank_mat, axis=0, prepend=rank_mat[:1]))
-        raw = np.sum(drank, axis=1)
-        win = max(1, int(fps))
-        tension_arr = pd.Series(raw).rolling(win, min_periods=1).sum().to_numpy()
-        tmax = float(tension_arr.max()) or 1.0
-        tension_arr = tension_arr / tmax
+    # Per-row rate ("goals over the last N steps") and retirement detection.
+    # Both are derived from the smoothed scores_df and only consulted when the
+    # corresponding render_cfg flag is on.
+    rate_window_steps = max(1, int(round(row_rate_window_years * steps_per_year)))
+    if show_row_rate:
+        rate_df = scores_df.diff(rate_window_steps).clip(lower=0)
     else:
-        tension_arr = None
+        rate_df = None
+
+    if show_retirement:
+        # An entity "retires" the first frame after which their cumulative
+        # value never increases again. Detected via the last frame where the
+        # forward diff is meaningfully positive. If they're still scoring at
+        # the very last frame, they are not flagged.
+        retirement_frame: dict = {}
+        eps = 1e-4
+        n_frames_total_pre = len(scores_df)
+        min_dead_steps = max(1, int(round(row_retired_dead_seasons * steps_per_year)))
+        for c in scores_df.columns:
+            v = scores_df[c].fillna(0).to_numpy(dtype=float)
+            if v.size < 2 or v.max() <= 0:
+                retirement_frame[c] = 10**9
+                continue
+            d = np.diff(v)
+            incr = np.where(d > eps)[0]
+            if incr.size == 0:
+                retirement_frame[c] = 10**9
+            elif incr[-1] >= n_frames_total_pre - min_dead_steps:
+                retirement_frame[c] = 10**9
+            else:
+                # Wait one rate-window before flagging so the badge doesn't
+                # pop the instant a player goes scoreless mid-season.
+                retirement_frame[c] = int(incr[-1]) + 1 + rate_window_steps
+    else:
+        retirement_frame = None
+
+    # ── Background animation (radial-drift only) ─────────────────────────
+    bg_anim_cfg = render_cfg.get('background_animation', {}) or {}
+    drift_period_seconds = bg_anim_cfg.get('drift_period_seconds')
+    drift_period_frames = (int(float(drift_period_seconds) * fps)
+                           if drift_period_seconds else None)
+    _bg_cache: dict = {}
 
     total_countries = len(data.columns)
 
-    # Precompute total-trend series (sum across countries per frame).
+    # Precompute total-trend series. By default it's Σ across countries per
+    # frame. In per-capita mode the pipeline injects a precomputed yearly
+    # worldwide-per-capita series (Σ raw / Σ pop) into render_cfg under
+    # `_world_trend_yearly`; we re-interpolate it onto the frame index so the
+    # trend reflects the global per-person average rather than a sum of
+    # per-capita values across mismatched country sizes.
     if show_total_trend:
-        trend_series = scores_df.fillna(0).sum(axis=1).to_numpy()
+        world_yearly = render_cfg.get('_world_trend_yearly')
+        if world_yearly is not None:
+            ws = pd.Series(world_yearly).copy()
+            ws.index = ws.index.astype(float)
+            trend_series = (
+                ws.reindex(ws.index.union(scores_df.index))
+                  .sort_index()
+                  .interpolate('linear')
+                  .reindex(scores_df.index)
+                  .ffill()
+                  .bfill()
+                  .to_numpy()
+            )
+        else:
+            trend_series = scores_df.fillna(0).sum(axis=1).to_numpy()
     else:
         trend_series = None
 
@@ -599,6 +630,27 @@ def render(data: pd.DataFrame,
     ax.set_ylim(0, 1)
     ax.axis('off')
 
+    # Global font scale: multiplies every fontsize=... arg passed to ax.text.
+    fs_scale = float(render_cfg.get('font_scale', 1.0))
+    if fs_scale != 1.0:
+        _orig_text = ax.text
+        def _scaled_text(*args, **kw):
+            fs = kw.get('fontsize')
+            if fs is not None:
+                kw['fontsize'] = max(1e-3, float(fs) * fs_scale)
+            return _orig_text(*args, **kw)
+        ax.text = _scaled_text
+
+    # Per-section font specs (size scale + weight). Stack on top of font_scale.
+    fonts_cfg = render_cfg.get('fonts', {}) or {}
+    def _spec(section, default_weight):
+        s = fonts_cfg.get(section, {}) or {}
+        return float(s.get('size_scale', 1.0)), s.get('weight', default_weight)
+    title_scale_fs, title_weight = _spec('title', 'bold')
+    header_scale_fs, header_weight = _spec('header', 'black')
+    row_scale_fs, row_weight = _spec('row', 'bold')
+    spot_scale_fs, spot_weight = _spec('spotlight', 1000)
+
     state = {
         'frame': 0,
         'prev_int_rank': {},
@@ -624,13 +676,9 @@ def render(data: pd.DataFrame,
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.axis('off')
-        if bg_anim_enabled:
-            t_val = float(tension_arr[frame_idx]) if tension_arr is not None else 0.0
-            _draw_background(ax, theme, frame_idx=frame_idx, fps=fps,
-                             tension=t_val, anim_cfg=bg_anim_cfg,
-                             cache=_bg_cache)
-        else:
-            _draw_background(ax, theme)
+        _draw_background(ax, theme, frame_idx=frame_idx, fps=fps,
+                         n_frames_total=n_frames_total,
+                         drift_period_frames=drift_period_frames)
 
         scores = scores_df.iloc[frame_idx]
         ranks = ranks_df.iloc[frame_idx]
@@ -663,7 +711,12 @@ def render(data: pd.DataFrame,
                                 t_title=t_title,
                                 t_draw=t_draw,
                                 total_value=current_total,
-                                value_format=value_format)
+                                value_format=value_format,
+                                value_suffix=value_suffix,
+                                title_scale_fs=title_scale_fs,
+                                title_weight=title_weight,
+                                header_scale_fs=header_scale_fs,
+                                header_weight=header_weight)
 
         ax.text(0.04, SAFE_BOTTOM - 0.02, source_credit.upper(),
                 transform=ax.transAxes, ha='left', va='bottom',
@@ -780,22 +833,47 @@ def render(data: pd.DataFrame,
                         alpha=0.55 * entry_alpha, zorder=2.6,
                         solid_capstyle='round')
 
-            rank_fs = _lerp(14, 28, s)
+            rank_fs = _lerp(14, 28, s) * row_scale_fs
             ax.text(columns.rank_x, y_center, str(int_rank),
                     ha='right', va='center',
                     color=theme.text_primary,
-                    fontsize=rank_fs, fontweight='bold',
+                    fontsize=rank_fs, fontweight=row_weight,
                     alpha=_lerp(0.55, 0.95, s) * entry_alpha,
                     fontfamily=theme.font_family, zorder=4)
 
-            name_fs = _lerp(13, 21, s)
-            label = display_name(country).upper()
+            name_fs = _lerp(13, 21, s) * row_scale_fs
+            label = display_name(country, max_chars=name_max_chars).upper()
             ax.text(columns.name_left, y_center, label,
                     ha='left', va='center',
                     color=theme.text_primary,
-                    fontsize=name_fs, fontweight='bold',
+                    fontsize=name_fs, fontweight=row_weight,
                     alpha=_lerp(0.9, 1.0, s) * entry_alpha,
                     fontfamily=theme.font_family, zorder=5)
+
+            # Right-edge badge inside the name card: per-window rate or
+            # retirement marker. Skipped when the card is too short to fit
+            # comfortably above the sparkline.
+            if (rate_df is not None or retirement_frame is not None) and card_h_i >= 0.030:
+                is_retired = (retirement_frame is not None
+                              and frame_idx >= retirement_frame.get(country, 10**9))
+                badge_text = ''
+                if is_retired:
+                    badge_text = row_retired_label
+                elif rate_df is not None:
+                    rv = float(rate_df.iloc[frame_idx][country]) if (
+                        country in rate_df.columns) else 0.0
+                    if np.isfinite(rv) and rv > 0.5:
+                        badge_text = f"+{int(round(rv))}{row_rate_label}"
+                if badge_text:
+                    badge_x = columns.name_box_right - 0.012
+                    badge_y = y_center + card_h * 0.28
+                    badge_fs = _lerp(11, 17, s) * row_scale_fs
+                    ax.text(badge_x, badge_y, badge_text,
+                            ha='right', va='center',
+                            color=theme.text_secondary,
+                            fontsize=badge_fs, fontweight=row_weight,
+                            alpha=0.85 * entry_alpha,
+                            fontfamily=theme.font_family, zorder=5)
 
             # Flag
             icon = get_flag(country)
@@ -804,14 +882,21 @@ def render(data: pd.DataFrame,
                 ih, iw = icon.shape[0], icon.shape[1]
                 draw_h = flag_h
                 draw_w = draw_h * (iw / ih) * (FIG_H_PX / FIG_W_PX)
+            else:
+                # No icon: render a virtual zero-width marker so the value
+                # text below can still anchor at the value's track position.
+                ih = iw = 1
+                draw_h = flag_h
+                draw_w = 0.0
 
-                fx = track_position(
-                    value, max_val,
-                    columns.track_left, columns.track_right,
-                    draw_w,
-                )
-                fy = y_center - draw_h / 2
+            fx = track_position(
+                value, max_val,
+                columns.track_left, columns.track_right,
+                draw_w,
+            )
+            fy = y_center - draw_h / 2
 
+            if icon is not None:
                 if flash_alpha > 0:
                     _rounded_rect(
                         ax, fx - 0.01, fy - 0.005,
@@ -829,41 +914,40 @@ def render(data: pd.DataFrame,
                           origin='upper', aspect='auto', zorder=5,
                           clip_on=False)
 
-                value_fs = _lerp(14, 24, s)
-                value_str = format_value(value, value_format).upper()
-                gap = 0.012
-                min_allowed_left = columns.track_left + 0.025
+            value_fs = _lerp(14, 24, s) * row_scale_fs
+            value_str = (format_value(value, value_format).upper() + (' ' + value_suffix if value_suffix else ''))
+            gap = 0.012
+            min_allowed_left = columns.track_left + 0.025
 
-                # Decide the side using the *final* (non-intro-scaled) geometry so the
-                # value text doesn't flip sides as the row scales up during intro.
-                draw_h_final = (card_h_i / race_intro_scale) * 0.96 if race_intro_scale > 0 else draw_h
-                draw_w_final = draw_h_final * (iw / ih) * (FIG_H_PX / FIG_W_PX)
-                fx_final = track_position(
-                    value, max_val,
-                    columns.track_left, columns.track_right,
-                    draw_w_final,
-                )
-                s_final = (card_h_i / race_intro_scale) / max_card_h_render if (
-                    race_intro_scale > 0 and max_card_h_render > 0) else s
-                value_fs_final = _lerp(14, 24, s_final)
-                approx_text_w_final = len(value_str) * (value_fs_final * 0.68 / FIG_W_PX)
-                place_left = (fx_final - gap - approx_text_w_final) >= min_allowed_left
+            # Decide the side using the *final* (non-intro-scaled) geometry so the
+            # value text doesn't flip sides as the row scales up during intro.
+            draw_h_final = (card_h_i / race_intro_scale) * 0.96 if race_intro_scale > 0 else draw_h
+            draw_w_final = draw_h_final * (iw / ih) * (FIG_H_PX / FIG_W_PX) if icon is not None else 0.0
+            fx_final = track_position(
+                value, max_val,
+                columns.track_left, columns.track_right,
+                draw_w_final,
+            )
+            s_final = (card_h_i / race_intro_scale) / max_card_h_render if (
+                race_intro_scale > 0 and max_card_h_render > 0) else s
+            value_fs_final = _lerp(14, 24, s_final) * row_scale_fs
+            approx_text_w_final = len(value_str) * (value_fs_final * 0.68 / FIG_W_PX)
+            place_left = (fx_final - gap - approx_text_w_final) >= min_allowed_left
 
-                trailing_x = fx - gap
-                if place_left:
-                    ax.text(trailing_x, y_center, value_str,
-                            ha='right', va='center',
-                            color=theme.text_primary,
-                            fontsize=value_fs, fontweight='bold',
-                            alpha=entry_alpha,
-                            fontfamily=theme.font_family, zorder=5)
-                else:
-                    ax.text(fx + draw_w + gap, y_center, value_str,
-                            ha='left', va='center',
-                            color=theme.text_primary,
-                            fontsize=value_fs, fontweight='bold',
-                            alpha=entry_alpha,
-                            fontfamily=theme.font_family, zorder=5)
+            if place_left:
+                ax.text(fx - gap, y_center, value_str,
+                        ha='right', va='center',
+                        color=theme.text_primary,
+                        fontsize=value_fs, fontweight=row_weight,
+                        alpha=entry_alpha,
+                        fontfamily=theme.font_family, zorder=5)
+            else:
+                ax.text(fx + draw_w + gap, y_center, value_str,
+                        ha='left', va='center',
+                        color=theme.text_primary,
+                        fontsize=value_fs, fontweight=row_weight,
+                        alpha=entry_alpha,
+                        fontfamily=theme.font_family, zorder=5)
 
         # ── Spotlight: curated-mode OR auto-select non-top-N mover ──────
         if spotlight_enabled:
@@ -968,7 +1052,9 @@ def render(data: pd.DataFrame,
                                 label_text=state.get('spotlight_active_label',
                                                      spotlight_label_text),
                                 subtext=state.get('spotlight_active_subtext', ''),
-                                value_format=value_format)
+                                value_format=value_format,
+                                spot_scale_fs=spot_scale_fs,
+                                spot_weight=spot_weight)
 
             prev = state['spotlight_prev']
             if prev is not None:
@@ -985,9 +1071,40 @@ def render(data: pd.DataFrame,
                                     label_text=state.get('spotlight_prev_label',
                                                          spotlight_label_text),
                                     subtext=state.get('spotlight_prev_subtext', ''),
-                                    value_format=value_format)
+                                    value_format=value_format,
+                                    spot_scale_fs=spot_scale_fs,
+                                    spot_weight=spot_weight)
                 else:
                     state['spotlight_prev'] = None
+
+    if single_frame_year is not None or single_frame_years:
+        idx = scores_df.index.to_numpy()
+        # Skip past the intro: intros key off state['frame'] (t_ease/50, t_title/18,
+        # t_draw/55). update() increments first, so set high enough that all
+        # easings clamp to 1.0 on every call.
+        if single_frame_years:
+            out_dir = single_frames_dir or (output_path.parent / 'preview_frames')
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for year in single_frame_years:
+                target = float(year)
+                frame_idx = int(np.argmin(np.abs(idx - target)))
+                state['frame'] = 200
+                update(frame_idx)
+                year_label = f"{idx[frame_idx]:.0f}"
+                png = out_dir / f"{year_label}.png"
+                fig.savefig(str(png), dpi=DPI, facecolor='#000000')
+                print(f"Preview frame saved → {png} (year≈{idx[frame_idx]:.2f})")
+        else:
+            target = float(single_frame_year)
+            frame_idx = int(np.argmin(np.abs(idx - target)))
+            png = single_frame_png_path or (output_path.parent / 'preview_frame.png')
+            png.parent.mkdir(parents=True, exist_ok=True)
+            state['frame'] = 200
+            update(frame_idx)
+            fig.savefig(str(png), dpi=DPI, facecolor='#000000')
+            print(f"Preview frame saved → {png} (year≈{idx[frame_idx]:.2f})")
+        plt.close(fig)
+        return
 
     if preview_timeframe:
         y0, y1 = preview_timeframe

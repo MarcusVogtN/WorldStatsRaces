@@ -44,8 +44,16 @@ def _archive_narration(cache_dir: Path) -> None:
 def run(config_path: Path, *, refetch: bool = False,
         validate_layout: bool = False,
         extract_movers: bool = False,
+        generate_script: bool = False,
         generate_narration: bool = False,
-        mux_narration: bool = False) -> None:
+        mux_narration: bool = False,
+        generate_variants: bool = False,
+        regenerate_section: str | None = None,
+        auto_assemble: bool = False,
+        per_capita_override: bool | None = None,
+        accumulated_override: bool | None = None,
+        preview_frame_year: float | None = None,
+        preview_frame_years: list | str | None = None) -> None:
     with open(config_path, 'r', encoding='utf-8') as f:
         cfg = json.load(f)
 
@@ -57,9 +65,11 @@ def run(config_path: Path, *, refetch: bool = False,
 
     source_cfg = cfg['source']
     asset_cfg = cfg.get('assets', {'type': 'flags'})
-    render_cfg = cfg.get('render', {})
+    render_cfg = dict(cfg.get('render', {}))
     theme = get_theme(cfg.get('theme', 'glass_dark'))
     value_format = cfg.get('value_format', 'currency')
+    if 'value_suffix' in cfg:
+        render_cfg['value_suffix'] = cfg['value_suffix']
     title = cfg.get('video_title', 'Race')
     output_name = cfg.get('output_filename', 'race.mp4')
     preview = cfg.get('preview_timeframe')
@@ -74,6 +84,80 @@ def run(config_path: Path, *, refetch: bool = False,
     else:
         print("Using cached source data (pass --refetch to re-download).")
         result = WorldBankSource.read_cache(cache_dir, source.source_credit)
+
+    # ── Per-capita transform (optional) ─────────────────────────────────────
+    per_capita = (per_capita_override if per_capita_override is not None
+                  else bool(cfg.get('per_capita', False)))
+    if per_capita:
+        if result.population is None:
+            raise SystemExit(
+                "Per-capita mode requested but cache/population.csv is missing. "
+                "Run `python run.py --refetch` to fetch population data.")
+        pop = result.population.copy()
+        pop.index = pop.index.astype(int)
+        pop = pop.reindex(index=result.data.index, columns=result.data.columns)
+        pop = pop.ffill().bfill()
+        pop = pop.where(pop > 0)  # avoid div-by-zero
+        # Worldwide per-capita trend = Σ(raw spending) / Σ(population) per year.
+        # Computed BEFORE the per-country division so the trend reflects the
+        # global average per person rather than a meaningless sum of
+        # per-capita values across countries of wildly different sizes.
+        _world_pc_yearly = (
+            result.data.fillna(0).sum(axis=1) / pop.fillna(0).sum(axis=1)
+        ).replace([float('inf'), float('-inf')], float('nan'))
+        render_cfg['_world_trend_yearly'] = _world_pc_yearly
+        result.data = (result.data / pop).dropna(axis=1, how='all')
+        stem, ext = (output_name.rsplit('.', 1) + ['mp4'])[:2]
+        if not stem.endswith('_per_capita'):
+            output_name = f"{stem}_per_capita.{ext}"
+        # Trend label: explicit override wins; otherwise auto-insert "per capita".
+        override_label = render_cfg.get('trend_label_per_capita')
+        base_label = render_cfg.get('trend_label')
+        if override_label:
+            render_cfg['trend_label'] = override_label
+        elif base_label and 'per capita' not in base_label.lower():
+            if ' — ' in base_label:
+                head, tail = base_label.split(' — ', 1)
+                render_cfg['trend_label'] = f"{head} per capita — {tail}"
+            else:
+                render_cfg['trend_label'] = f"{base_label} per capita"
+        print(f"[per-capita] applied — title='{title}', output='{output_name}', "
+              f"trend_label='{render_cfg.get('trend_label', '')}', "
+              f"{len(result.data.columns)} countries remain.")
+
+    # ── Accumulated (cumulative-sum) transform (optional) ───────────────────
+    accumulated = (accumulated_override if accumulated_override is not None
+                   else bool(cfg.get('accumulated', False)))
+    if accumulated:
+        result.data = result.data.fillna(0).cumsum().dropna(axis=1, how='all')
+        if '_world_trend_yearly' in render_cfg:
+            render_cfg['_world_trend_yearly'] = (
+                render_cfg['_world_trend_yearly'].fillna(0).cumsum())
+        stem, ext = (output_name.rsplit('.', 1) + ['mp4'])[:2]
+        if not stem.endswith('_cumulative'):
+            output_name = f"{stem}_cumulative.{ext}"
+        # Trend label: explicit override wins; otherwise prefix "Cumulative ".
+        override_label = render_cfg.get('trend_label_accumulated')
+        base_label = render_cfg.get('trend_label')
+        if override_label:
+            render_cfg['trend_label'] = override_label
+        elif base_label and 'cumulative' not in base_label.lower():
+            # Replace a leading "Total " with "Cumulative " if present, else prepend.
+            if base_label.lower().startswith('total '):
+                render_cfg['trend_label'] = 'Cumulative ' + base_label[len('Total '):]
+            else:
+                render_cfg['trend_label'] = f"Cumulative {base_label}"
+        print(f"[accumulated] applied — title='{title}', output='{output_name}', "
+              f"trend_label='{render_cfg.get('trend_label', '')}'.")
+
+    # ── Optional unit scaling (e.g. Mt → t = 1e6) ────────────────────────────
+    value_scale = cfg.get('value_scale')
+    if value_scale and float(value_scale) != 1.0:
+        scale = float(value_scale)
+        result.data = result.data * scale
+        if '_world_trend_yearly' in render_cfg:
+            render_cfg['_world_trend_yearly'] = render_cfg['_world_trend_yearly'] * scale
+        print(f"[value_scale] applied ×{scale:g}")
 
     # ── Assets ───────────────────────────────────────────────────────────────
     provider = build_provider(asset_cfg, cache_dir)
@@ -111,15 +195,53 @@ def run(config_path: Path, *, refetch: bool = False,
         )
         return
 
-    # ── Generate narration (script + TTS) and exit ───────────────────────
-    if generate_narration:
+    # ── Generate narration (script + optional TTS) and exit ──────────────
+    if auto_assemble:
+        from .narration.assemble import write_narration_json
+        variants_path = cache_dir / 'variants.json'
+        if not variants_path.exists():
+            raise SystemExit(
+                f"--auto-assemble: {variants_path} not found. "
+                "Run `python run.py --generate-variants` first.")
+        variants = json.loads(variants_path.read_text(encoding='utf-8'))
+        for key in ('hooks', 'middles', 'endings'):
+            if not variants.get(key):
+                raise SystemExit(f"--auto-assemble: variants.json has no '{key}' options.")
+        narration_cfg = (cfg.get('render') or {}).get('narration') or {}
+        write_narration_json(
+            hook=variants['hooks'][0],
+            middle=variants['middles'][0],
+            ending=variants['endings'][0],
+            narration_path=cache_dir / 'narration.json',
+            tone=narration_cfg.get('tone'),
+            words_per_second=float(narration_cfg.get('words_per_second', 2.7)),
+            source='auto',
+        )
+        print(f"[auto-assemble] wrote {cache_dir / 'narration.json'} "
+              "(picked option 0 from each section).")
+        return
+
+    if generate_narration or generate_script or generate_variants or regenerate_section:
         from .render.big_movers import interpolate_and_rank
         from .narration.stats import build_stat_pack
         from .narration.timeline import build_timeline
-        from .narration.script import generate_script
+        from .narration.script import (
+            generate_script as _generate_script,
+            generate_variants as _generate_variants,
+            regenerate_section as _regenerate_section,
+        )
         from .narration.voice import synthesize
 
-        narration_cfg = render_cfg.get('narration', {})
+        narration_cfg = dict(render_cfg.get('narration', {}))
+        if accumulated and per_capita:
+            mode = 'cumulative per capita'
+        elif accumulated:
+            mode = 'cumulative total'
+        elif per_capita:
+            mode = 'per capita'
+        else:
+            mode = 'total'
+        narration_cfg['value_mode'] = mode
         steps_per_year = int(render_cfg.get('steps_per_year', 60))
         fps = int(render_cfg.get('fps', 30))
         smooth_a = int(render_cfg.get('rank_smooth_window_a', 25))
@@ -150,18 +272,59 @@ def run(config_path: Path, *, refetch: bool = False,
             end_hold_seconds=end_hold_seconds,
         )
 
-        _archive_narration(cache_dir)
+        if generate_variants:
+            _generate_variants(
+                stat_pack=stat_pack,
+                timeline=timeline,
+                narration_cfg=narration_cfg,
+                out_path=cache_dir / 'variants.json',
+            )
+            return
 
-        script_doc = generate_script(
-            stat_pack=stat_pack,
-            timeline=timeline,
-            narration_cfg=narration_cfg,
-            out_path=cache_dir / 'narration.json',
-        )
+        if regenerate_section:
+            _regenerate_section(
+                section=regenerate_section,
+                stat_pack=stat_pack,
+                timeline=timeline,
+                narration_cfg=narration_cfg,
+                out_path=cache_dir / 'variants.json',
+            )
+            return
+
+        # If --auto-assemble already wrote narration.json with source=auto,
+        # honor that exact script instead of regenerating.
+        narration_json_path = cache_dir / 'narration.json'
+        pre_assembled = False
+        script_doc: dict | None = None
+        if narration_json_path.exists():
+            try:
+                existing = json.loads(narration_json_path.read_text(encoding='utf-8'))
+                meta = existing.get('meta') or {}
+                if meta.get('source') == 'auto' and existing.get('script_text'):
+                    pre_assembled = True
+                    script_doc = existing
+                    print(f"[narration] using pre-assembled script_text "
+                          f"(source=auto) from {narration_json_path} "
+                          f"(skipping LLM regeneration).")
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        if not pre_assembled:
+            _archive_narration(cache_dir)
+            script_doc = _generate_script(
+                stat_pack=stat_pack,
+                timeline=timeline,
+                narration_cfg=narration_cfg,
+                out_path=narration_json_path,
+            )
         if script_doc.get('suggested_trim'):
             st = script_doc['suggested_trim']
             print(f"[narration] suggested_trim: start_year={st.get('start_year')} "
                   f"— {st.get('reason')} (not applied; update config.json manually)")
+
+        if generate_script and not generate_narration:
+            print("[narration] script-only mode — skipping ElevenLabs TTS to save credits.")
+            return
 
         synthesize(
             script_doc=script_doc,
@@ -194,6 +357,21 @@ def run(config_path: Path, *, refetch: bool = False,
     # ── Fonts ────────────────────────────────────────────────────────────────
     ensure_orbitron(cache_dir)
 
+    # ── Resolve --preview-frames "auto" against the data's year range ────────
+    resolved_preview_years: list | None = None
+    if preview_frame_years is not None:
+        if isinstance(preview_frame_years, str) and preview_frame_years == 'auto':
+            years = sorted(float(y) for y in result.data.index)
+            if years:
+                y0, y1 = years[0], years[-1]
+                span = y1 - y0
+                resolved_preview_years = [y0, y0 + span * 0.25, y0 + span * 0.5,
+                                          y0 + span * 0.75, y1]
+        elif isinstance(preview_frame_years, list):
+            resolved_preview_years = list(preview_frame_years)
+
+    is_single_frame = preview_frame_year is not None or resolved_preview_years is not None
+
     # ── Render ───────────────────────────────────────────────────────────────
     render(
         data=result.data,
@@ -204,5 +382,11 @@ def run(config_path: Path, *, refetch: bool = False,
         theme=theme,
         output_path=output_dir / output_name,
         render_cfg=render_cfg,
-        preview_timeframe=preview,
+        preview_timeframe=preview if not is_single_frame else None,
+        single_frame_year=preview_frame_year,
+        single_frame_png_path=(cache_dir / 'preview_frame.png'
+                               if preview_frame_year is not None else None),
+        single_frame_years=resolved_preview_years,
+        single_frames_dir=(cache_dir / 'preview_frames'
+                           if resolved_preview_years is not None else None),
     )

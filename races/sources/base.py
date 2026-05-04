@@ -6,7 +6,8 @@ flags, ticker symbol for stocks).
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 import pandas as pd
 
 
@@ -15,6 +16,7 @@ class SourceResult:
     data: pd.DataFrame           # index = Year (int), columns = entity display names
     icon_ids: dict               # display name -> icon id (e.g. 'us')
     source_credit: str           # shown in video footer, e.g. 'Source: World Bank'
+    population: Optional[pd.DataFrame] = None  # same shape as data; None if unavailable
 
 
 class DataSource(ABC):

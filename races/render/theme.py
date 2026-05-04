@@ -16,8 +16,8 @@ PALETTE = [
 # background: solid hex
 #  OR ("gradient", c_top, c_bottom)
 #  OR ("radial", c_center, c_edge)
-#  OR ("lava", c_center, c_edge, c_blob) — animated blurred-blob overlay with tension pulse
-BackgroundSpec = Union[str, Tuple[str, ...]]
+#  OR ("radial_drift", [c_center_1, c_center_2, ...], c_edge)
+BackgroundSpec = Union[str, Tuple]
 
 
 @dataclass
@@ -64,31 +64,39 @@ GLASS_DARK = Theme(
     font_family='Orbitron',
 )
 
-FLAT_LIGHT = Theme(
-    name='flat_light',
-    background='#f8fafc',
-    bar_style='solid',
-    bar_corner_radius_px=8,
-    bar_opacity=1.0,
-    bar_backdrop=False,
-    bar_inner_gradient=False,
-    row_card=False,
-    row_card_color='#000000',
-    row_card_opacity=0.0,
-    row_card_corner_radius_px=0,
-    title_card=False,
-    title_card_color='#000000',
-    title_card_opacity=0.0,
-    font_family='DejaVu Sans',
-    text_primary='#0f172a',
-    text_secondary='#475569',
-    show_sparkline=False,
+# Dark center palette for the drifting radial. All entries are deliberately
+# low-lightness so the frame never brightens too much; edges stay pure black
+# via the radial smoothstep falloff in renderer._draw_background.
+DARK_DRIFT_CENTERS = [
+    '#1e293b',  # slate blue (matches glass_dark default)
+    '#3b1e3a',  # dark plum
+    '#1e3a32',  # dark forest
+    '#3a1e1e',  # dark crimson
+    '#2a1e3a',  # dark indigo
+]
+
+GLASS_DARK_DRIFT = Theme(
+    name='glass_dark_drift',
+    background=('radial_drift', DARK_DRIFT_CENTERS, '#000000'),
+    bar_style='glass',
+    bar_corner_radius_px=18,
+    bar_opacity=0.55,
+    bar_backdrop=True,
+    bar_inner_gradient=True,
+    row_card=True,
+    row_card_color='#ffffff',
+    row_card_opacity=0.04,
+    row_card_corner_radius_px=22,
+    title_card=True,
+    title_card_color='#ffffff',
+    title_card_opacity=0.08,
+    font_family='Orbitron',
 )
 
 
-GLASS_DARK_LAVA = Theme(
-    name='glass_dark_lava',
-    background=('lava', '#1e3a8a', '#000000', '#1e40af'),
+GLASS_DARK_BLACK = Theme(
+    name='glass_dark_black',
+    background='#000000',
     bar_style='glass',
     bar_corner_radius_px=18,
     bar_opacity=0.55,
@@ -107,8 +115,8 @@ GLASS_DARK_LAVA = Theme(
 
 THEMES = {
     GLASS_DARK.name: GLASS_DARK,
-    GLASS_DARK_LAVA.name: GLASS_DARK_LAVA,
-    FLAT_LIGHT.name: FLAT_LIGHT,
+    GLASS_DARK_DRIFT.name: GLASS_DARK_DRIFT,
+    GLASS_DARK_BLACK.name: GLASS_DARK_BLACK,
 }
 
 

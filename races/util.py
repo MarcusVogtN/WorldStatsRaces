@@ -8,15 +8,19 @@ def safe_filename(name: str) -> str:
     return re.sub(r'[<>:"/\\|?*]', '_', name)
 
 
-def format_value(v: float, fmt: str) -> str:
+def format_value(v: float, fmt: str, suffix: str = '') -> str:
     if pd.isna(v) or v == 0:
         return ''
+    tail = f' {suffix}' if suffix else ''
+    # Plain integer counts (goals, wins, etc.) — never abbreviated.
+    if fmt in ('count', 'integer', 'goals'):
+        return f'{int(round(v)):,}{tail}'
     prefix = '$' if fmt == 'currency' else ''
     # Aim for ~3 significant digits: when the leading number is single-digit,
     # show 2 decimals (e.g. $2.30 T); otherwise drop decimals (e.g. $12 T).
-    def _fmt(n: float, suffix: str) -> str:
+    def _fmt(n: float, mag: str) -> str:
         decimals = 2 if n < 10 else 0
-        return f'{prefix}{n:.{decimals}f} {suffix}'
+        return f'{prefix}{n:.{decimals}f} {mag}{tail}'
     if v >= 1e12:
         return _fmt(v / 1e12, 'T')
     if v >= 1e9:
@@ -25,7 +29,7 @@ def format_value(v: float, fmt: str) -> str:
         return _fmt(v / 1e6, 'M')
     if v >= 1e3:
         return _fmt(v / 1e3, 'K')
-    return f'{prefix}{v:,.0f}'
+    return f'{prefix}{v:,.0f}{tail}'
 
 
 DISPLAY_NAMES = {
