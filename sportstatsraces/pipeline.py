@@ -92,3 +92,24 @@ def run(config_path: Path, *,
         single_frames_dir=(cache_dir / 'preview_frames'
                            if resolved_preview_years is not None else None),
     )
+
+    if not is_single_frame:
+        from races.youtube import manifest as _manifest
+        _manifest.write(
+            channel='sports',
+            output_path=output_dir / output_name,
+            cache_dir=cache_dir,
+            config_path=Path(config_path),
+            config_snapshot=cfg,
+            render_cfg=render_cfg,
+            theme_name=cfg.get('theme', 'glass_dark_black'),
+            dataset={
+                'source_type': source_cfg.get('type'),
+                'indicator': source_cfg.get('indicator'),
+                'season': source_cfg.get('season'),
+                'competition': source_cfg.get('competition'),
+            },
+            video_title=title,
+            transforms={},
+            source_credit=result.source_credit,
+        )

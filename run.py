@@ -17,6 +17,13 @@ Usage:
     python run.py --accumulated / --no-accumulated # world only
     python run.py --preview-frame YEAR             # single PNG preview
     python run.py --preview-frames auto|y1,y2,...  # multi-frame preview
+
+YouTube integration (requires `pip install google-api-python-client
+google-auth-oauthlib`):
+    python run.py --channel CHAN --auth-youtube       # OAuth (one-time per channel)
+    python run.py --channel CHAN --upload PATH        # upload mp4 as private draft
+    python run.py --channel CHAN --pull-analytics     # refresh cache/analytics.db
+    python run.py --analytics-report [--last 30]      # markdown report → output/
 """
 
 import argparse
@@ -64,7 +71,47 @@ def main():
                    action='store_false', default=None)
     p.add_argument('--preview-frame', type=float, default=None)
     p.add_argument('--preview-frames', type=str, default=None)
+
+    # ── YouTube integration ─────────────────────────────────────────────
+    p.add_argument('--auth-youtube', action='store_true',
+                   help='Run OAuth flow for the selected channel')
+    p.add_argument('--upload', type=str, default=None, metavar='MP4',
+                   help='Upload an mp4 to YouTube as a private draft')
+    p.add_argument('--manifest', type=str, default=None,
+                   help='Override manifest sidecar path for --upload')
+    p.add_argument('--pull-analytics', action='store_true',
+                   help='Refresh cache/analytics.db from YouTube APIs')
+    p.add_argument('--analytics-report', action='store_true',
+                   help='Write markdown analytics report to output/')
+    p.add_argument('--last', type=int, default=30,
+                   help='Lookback window in days for --pull-analytics / --analytics-report')
+    p.add_argument('--all-channels', action='store_true',
+                   help='--analytics-report: aggregate across both channels instead of scoping to --channel')
+
     args = p.parse_args()
+
+    repo_root = Path(__file__).resolve().parent
+
+    # ── YouTube subcommands run before any pipeline work ─────────────────
+    if args.auth_youtube:
+        from races.youtube import auth
+        auth.authorize(repo_root, args.channel)
+        return
+    if args.upload:
+        from races.youtube import upload as yt_upload
+        yt_upload.upload(repo_root, args.channel, Path(args.upload),
+                         Path(args.manifest) if args.manifest else None)
+        return
+    if args.pull_analytics:
+        from races.youtube import analytics as yt_analytics
+        yt_analytics.pull(repo_root, args.channel, lookback_days=args.last)
+        return
+    if args.analytics_report:
+        from races.youtube import report as yt_report
+        scope = None if args.all_channels else args.channel
+        yt_report.generate(repo_root, channel=scope,
+                           lookback_days=args.last)
+        return
 
     preview_frames = None
     if args.preview_frames is not None:
