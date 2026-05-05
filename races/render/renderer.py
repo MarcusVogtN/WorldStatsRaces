@@ -15,7 +15,7 @@ from ..util import format_value, display_name
 
 from .theme import Theme, assign_colors
 from .layout import (
-    Columns, DEFAULT_COLUMNS, VerticalLayout, DEFAULT_VERTICAL,
+    Columns, DEFAULT_COLUMNS, VerticalLayout,
     track_position, smoothstep,
 )
 from .big_movers import interpolate_and_rank, load_curated

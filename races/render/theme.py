@@ -2,7 +2,7 @@
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import Literal, Tuple, Union
+from typing import Tuple, Union
 
 # Vivid Tailwind 400-series — reads well on dark backgrounds.
 PALETTE = [
@@ -24,11 +24,6 @@ BackgroundSpec = Union[str, Tuple]
 class Theme:
     name: str
     background: BackgroundSpec
-    bar_style: Literal['glass', 'solid', 'gradient']
-    bar_corner_radius_px: int
-    bar_opacity: float
-    bar_backdrop: bool            # translucent wider rect behind bar (frosted tint)
-    bar_inner_gradient: bool      # light highlight band within bar
     row_card: bool
     row_card_color: str
     row_card_opacity: float
@@ -40,20 +35,12 @@ class Theme:
     accent_palette: list = field(default_factory=lambda: list(PALETTE))
     text_primary: str = '#ffffff'
     text_secondary: str = '#cbd5e1'
-    show_sparkline: bool = True
-    show_total: bool = True
-    smooth_year_ticker: bool = True
     rank_flash: bool = True
 
 
 GLASS_DARK = Theme(
     name='glass_dark',
     background=('radial', '#1e293b', '#000000'),
-    bar_style='glass',
-    bar_corner_radius_px=18,
-    bar_opacity=0.55,
-    bar_backdrop=True,
-    bar_inner_gradient=True,
     row_card=True,
     row_card_color='#ffffff',
     row_card_opacity=0.04,
@@ -78,11 +65,6 @@ DARK_DRIFT_CENTERS = [
 GLASS_DARK_DRIFT = Theme(
     name='glass_dark_drift',
     background=('radial_drift', DARK_DRIFT_CENTERS, '#000000'),
-    bar_style='glass',
-    bar_corner_radius_px=18,
-    bar_opacity=0.55,
-    bar_backdrop=True,
-    bar_inner_gradient=True,
     row_card=True,
     row_card_color='#ffffff',
     row_card_opacity=0.04,
@@ -97,11 +79,6 @@ GLASS_DARK_DRIFT = Theme(
 GLASS_DARK_BLACK = Theme(
     name='glass_dark_black',
     background='#000000',
-    bar_style='glass',
-    bar_corner_radius_px=18,
-    bar_opacity=0.55,
-    bar_backdrop=True,
-    bar_inner_gradient=True,
     row_card=True,
     row_card_color='#ffffff',
     row_card_opacity=0.04,

@@ -12,7 +12,6 @@ text can never cross into it.
 """
 
 from dataclasses import dataclass
-from typing import List, Tuple
 import numpy as np
 
 
@@ -41,14 +40,6 @@ DEFAULT_COLUMNS = Columns(
 
 
 @dataclass
-class RowSlot:
-    country: str
-    y_center: float
-    y_bottom: float
-    slot_h: float
-
-
-@dataclass
 class VerticalLayout:
     race_top: float
     race_bottom: float
@@ -57,43 +48,6 @@ class VerticalLayout:
     @property
     def race_height(self) -> float:
         return self.race_top - self.race_bottom
-
-    def compute_rows(self,
-                     ordered_countries: List[str],
-                     ordered_values: List[float],
-                     *,
-                     min_weight: float = 0.35) -> List[RowSlot]:
-        """Return RowSlots walking down from race_top in display-rank order.
-
-        `ordered_countries`/`ordered_values` are already sorted #1..#N by display rank.
-        Slot heights are proportional to max(min_weight, value/max_value) and sum
-        to race_height. Values that are NaN/non-positive use min_weight.
-        """
-        max_v = max((v for v in ordered_values
-                     if np.isfinite(v) and v > 0), default=0.0)
-
-        weights = []
-        for v in ordered_values:
-            if max_v <= 0 or not np.isfinite(v) or v <= 0:
-                weights.append(min_weight)
-            else:
-                weights.append(max(min_weight, float(v) / max_v))
-
-        total_w = sum(weights) or 1.0
-        race_h = self.race_height
-
-        rows: List[RowSlot] = []
-        cursor = self.race_top
-        for country, w in zip(ordered_countries, weights):
-            slot_h = race_h * w / total_w
-            y_bottom = cursor - slot_h
-            y_center = cursor - slot_h / 2
-            rows.append(RowSlot(country, y_center, y_bottom, slot_h))
-            cursor = y_bottom
-        return rows
-
-
-DEFAULT_VERTICAL = VerticalLayout(race_top=0.78, race_bottom=0.25, n_on_screen=10)
 
 
 def track_position(value: float, max_value: float,
