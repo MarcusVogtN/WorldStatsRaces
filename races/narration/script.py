@@ -25,6 +25,19 @@ Shorts bar-chart race. One take, straight through, hype and casual — like \
 you're on the couch reacting with a friend, not anchoring the 6 o'clock \
 news.
 
+# Reading level — 10-YEAR-OLD CAN UNDERSTAND EVERY SENTENCE
+- Vocabulary cap: every sentence must be understandable to a 10-year-old. \
+If you use a word a 10-year-old wouldn't say on the playground, replace \
+it with one they would. No fancy synonyms. No jargon. No suit-and-tie \
+words.
+- Sentences are short. Two clauses max. Ideally one. If a sentence has \
+three commas it's too long — break it up.
+- Concrete > abstract. "Money" beats "expenditure". "Got hit hard" beats \
+"experienced a sharp decline". "People who visit" beats "international \
+arrivals". "Way more" beats "significantly greater".
+- The whole script should feel like a friend explaining it to a kid \
+sibling, not a news anchor reporting it.
+
 # Voice & persona — LOUD, INFORMAL, EXCITED, EXTREMELY ONLINE
 - You are NOT a professional announcer most of the time. You're a hype \
 friend on TikTok / Shorts who can't believe what you're seeing. Casual, \
@@ -149,13 +162,32 @@ figure.
 - The first sentence is a HOOK and a QUESTION. Pull the viewer in, get \
 them curious, get them guessing.
 
-# Opening — QUESTION, not a summary
-- Start with ONE engaging question in ≤10 words. Examples:
-  - "Which country do you think spends the most on their military?"
-  - "Guess how much the US spends compared to everyone else."
-  - "Watch what happens when you line up 60 years of military budgets."
-- Do NOT reveal the answer in the opening. Tease it, then make the viewer \
-watch.
+# Opening — A SIMPLE QUESTION A 10-YEAR-OLD UNDERSTANDS
+The viewer has no idea what they're looking at. Your single most important \
+job in beat 1 is to tell them — in the most plain, simple language \
+possible. Imagine explaining to a 10-year-old who just walked in.
+- The opening is a SHORT, SIMPLE QUESTION about the topic of the data — \
+not a description of bars or charts. Use everyday words. ≤10 words. The \
+question itself tells the viewer what's being measured.
+- Use `metric_label` and `video_title` in the user payload to know what \
+the topic is, but DO NOT mention "bars", "chart", "race", "leaderboard", \
+"data", "ranking", "graph", "values", "stats" in the opening question. \
+Just ask the topic naturally.
+- Examples of GOOD opening questions:
+  - "Which country has the most tourists?"
+  - "Which country spends the most money on its army?"
+  - "Which country has put the most CO2 into the air, ever?"
+  - "Which country has the most people?"
+- Examples of BAD openings:
+  - "Each bar is a country racing tourist arrivals…" (mentions bars)
+  - "Today we're looking at tourism data" (formal, no stakes)
+  - "Tell me why one of these countries is about to get cooked" (vague — \
+    viewer has no idea what the topic is)
+- After the question, you may add ONE short curiosity tease (≤8 words) \
+inside the same beat 1, but the question alone is also fine.
+- Do NOT name countries, ranks, or specific numbers in beat 1.
+- Vocabulary: use words a 10-year-old uses. No jargon. No fancy synonyms. \
+Pretend you're explaining it on the playground.
 
 # Structure — ONE LINEAR STORY, 3 BEATS
 - Three (max four) beats. ONE coherent story. NOT a list of facts. NOT a \
@@ -189,8 +221,7 @@ the video. Short means dead air; long means cut off mid-sentence.
 - Count your words before emitting.
 
 # Output
-Call the `emit_script` tool exactly once with `script_text` and \
-`suggested_trim`. Do not output prose outside the tool call.
+Call the `emit_variants` tool (defined in the variants addendum below).
 """
 
 
@@ -211,143 +242,6 @@ def _value_mode_note(mode: str) -> str:
         return ("Values are PER CAPITA (per person). Phrase comparisons as "
                 "'per person' / 'per citizen' — never imply country totals.")
     return "Values are country TOTALS for the current year."
-
-
-SCRIPT_TOOL = {
-    "name": "emit_script",
-    "description": "Emit the continuous commentator script and an optional trim suggestion.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "suggested_trim": {
-                "type": ["object", "null"],
-                "description": "Null if the full timeframe is fine, otherwise a trim suggestion.",
-                "properties": {
-                    "start_year": {"type": "integer"},
-                    "reason": {"type": "string"},
-                    "boringness": {"type": "number"},
-                },
-                "required": ["start_year", "reason"],
-            },
-            "script_text": {
-                "type": "string",
-                "description": "Single continuous commentator script, read straight through over the whole video. One paragraph. Starts with a question. Builds in the future tense. Pays off at the end.",
-            },
-        },
-        "required": ["script_text"],
-    },
-}
-
-
-def generate_script(*,
-                    stat_pack: dict,
-                    timeline: dict,
-                    narration_cfg: dict,
-                    out_path: Path) -> dict[str, Any]:
-    """Call Claude, validate length, write cache/narration.json."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY not set. Export it or add it to `.env`."
-        )
-
-    client = anthropic.Anthropic(api_key=api_key)
-    model = narration_cfg.get("model", "claude-opus-4-7")
-    wps = float(narration_cfg.get("words_per_second", 2.7))
-    coverage = float(narration_cfg.get("max_speech_coverage", 0.6))
-    tone = narration_cfg.get("tone", "hype friend, casual, loud")
-    duration = float(timeline["video_duration_seconds"])
-    # Pace speech to end before any hold on the final frame.
-    speech_window = float(timeline.get("animation_seconds", duration))
-    target_words = int(speech_window * wps * coverage)
-
-    value_mode = narration_cfg.get("value_mode", "total")
-    user_payload = {
-        "tone": tone,
-        "words_per_second": wps,
-        "video_duration_seconds": duration,
-        "speech_window_seconds": speech_window,
-        "target_word_count": target_words,
-        "value_mode": value_mode,
-        "value_mode_note": _value_mode_note(value_mode),
-        "year_to_seconds_map": timeline["year_to_seconds"],
-        "events": timeline["events"],
-        "stat_pack": stat_pack,
-    }
-
-    system = [{
-        "type": "text",
-        "text": SYSTEM_PROMPT,
-        "cache_control": {"type": "ephemeral"},
-    }]
-
-    response = client.messages.create(
-        model=model,
-        max_tokens=2048,
-        system=system,
-        tools=[SCRIPT_TOOL],
-        tool_choice={"type": "tool", "name": "emit_script"},
-        messages=[{
-            "role": "user",
-            "content": [{
-                "type": "text",
-                "text": (
-                    f"Write ~{target_words} words (±10%) for a "
-                    f"{duration:.1f}-second video. Open with a QUESTION. "
-                    "Write in the future tense — tease what's coming, do NOT "
-                    "reveal the final numbers until the last beat. Three "
-                    "beats, one linear story. Hype friend voice, not news "
-                    "anchor. Count your words before emitting.\n\n"
-                    + json.dumps(user_payload, ensure_ascii=False)
-                ),
-            }],
-        }],
-    )
-
-    script_doc: dict[str, Any] | None = None
-    for block in response.content:
-        if getattr(block, "type", None) == "tool_use" and block.name == "emit_script":
-            script_doc = block.input  # type: ignore[assignment]
-            break
-    if script_doc is None:
-        raise RuntimeError("Model did not call `emit_script`. Response: "
-                           + repr(response.content))
-
-    script_text: str = script_doc["script_text"].strip()
-    word_count = len(script_text.split())
-    est_seconds = word_count / wps
-    print(f"[narration] script: {word_count} words, ~{est_seconds:.1f}s of speech "
-          f"(target {target_words} words / {duration:.1f}s video)")
-    if est_seconds > duration * 1.1:
-        print(f"[narration] warn: script may overrun video by "
-              f"{est_seconds - duration:.1f}s")
-
-    script_doc["script_text"] = script_text
-    script_doc.setdefault("meta", {})
-    script_doc["meta"].update({
-        "generated_at": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        "model": model,
-        "video_duration_seconds": duration,
-        "words_per_second": wps,
-        "target_word_count": target_words,
-        "actual_word_count": word_count,
-        "estimated_seconds": round(est_seconds, 2),
-        "tone": tone,
-        "usage": {
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "cache_read_input_tokens": getattr(
-                response.usage, "cache_read_input_tokens", 0),
-            "cache_creation_input_tokens": getattr(
-                response.usage, "cache_creation_input_tokens", 0),
-        },
-    })
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(script_doc, f, ensure_ascii=False, indent=2)
-    print(f"→ wrote {out_path}")
-    return script_doc
 
 
 # ── Variants mode ────────────────────────────────────────────────────────────
@@ -383,14 +277,22 @@ def _compute_section_year_ranges(timeline: dict, speech_window: float) -> dict:
 
 _SECTION_GUIDE = {
     "hook": (
-        "Beat 1 — pure curiosity bait. ≤10 words each. Open a loop in the "
-        "viewer's head; do NOT close it. NEVER reveal a country name, a "
-        "rank, a number, or any outcome. Speak generally about the race. "
-        "Hype voice only — never the broadcaster cut-in. Each of the 5 "
-        "options must be genuinely different (different angle, different "
-        "phrasing). Examples of vibe (do not copy): 'guess who runs this "
-        "thing', 'one of these countries snaps', 'watch the leaderboard go "
-        "feral'."
+        "Beat 1 — a short, simple QUESTION a 10-year-old understands. "
+        "The question itself names the topic of the data (what's being "
+        "measured) so the viewer instantly knows what's about to happen. "
+        "Derive the topic from `metric_label` and `video_title` in the "
+        "user payload, but speak it in plain everyday words. "
+        "DO NOT mention 'bars', 'chart', 'race', 'leaderboard', 'data', "
+        "'ranking', 'graph', 'stats' — just ask about the topic. "
+        "Examples of GOOD: 'Which country has the most tourists?', "
+        "'Which country spends the most on its army?', 'Which country "
+        "has put the most CO2 into the air, ever?'. "
+        "Examples of BAD: 'each bar is a country racing tourist arrivals' "
+        "(mentions bars), 'tell me why one of these is about to get "
+        "cooked' (vague, no topic). "
+        "≤10 words for the question. You MAY follow with one short tease "
+        "(≤8 words) inside the same beat, but it's optional. NEVER name a "
+        "country, rank, number, or outcome. Hype voice only."
     ),
     "middle": (
         "Beat 2 — the MID-RACE vibe. Your job is storytelling, jokes, and "
@@ -408,9 +310,7 @@ _SECTION_GUIDE = {
         "place for the ONE broadcaster cut-in sentence — but it too stays "
         "inside the middle window AND obeys the no-play-by-play rule (it "
         "can describe a country's general run, not 'reaches second place "
-        "in 2008'). Each of the 3 options should take a meaningfully "
-        "different angle (different country focus, different joke, "
-        "different vibe)."
+        "in 2008')."
     ),
     "ending": (
         "Beat 3 — the payoff. You may ONLY refer to the year window given "
@@ -418,9 +318,7 @@ _SECTION_GUIDE = {
         "dollar values, NO per-person figures, NO percentages — the ticker "
         "on screen shows the numbers. Land the final RANKING and any wow "
         "stat from stat_pack (longest-reign-at-#1 in years, total years on "
-        "screen, etc.). Hype voice only — never the broadcaster cut-in. "
-        "Each of the 3 options should land the payoff differently (pure "
-        "rank-1 flex, top-3 sweep, longest-reign stat, biggest climber)."
+        "screen, etc.). Hype voice only — never the broadcaster cut-in."
     ),
 }
 
@@ -431,21 +329,22 @@ You are writing short SECTION options, NOT a full script. The full script has
 three beats (hook → turn → payoff); each run of this tool emits alternatives
 for ONE OR MORE beats so a human editor can pick the best combo.
 
-- Each option is a standalone snippet for its beat — a couple of sentences,
-  self-contained, readable on its own.
+- Each beat emits ONE option (a standalone snippet — a couple of sentences,
+  self-contained, readable on its own).
 - Respect the per-section word budget in the user payload. Aim for the target
   ±15%.
 - Respect the hook/payoff rule: the broadcaster cut-in sentence appears ONLY
   in `middle`, NEVER in `hook` or `ending`.
-- Options within a section must be meaningfully different — different angle,
-  different focus, different rhythm. No reworded near-duplicates.
 - All other rules from the main system prompt still apply (country whitelist,
   NO numeric/dollar values anywhere, future tense for hook/middle, no USSR
   unless in `countries_in_data`, 10-year-old reading level).
 - HARD NO-SPOILER RULE. The viewer should not know how the race ends until the
   ending plays. Therefore:
-    - The HOOK names NO countries, NO ranks, NO numbers. It is pure curiosity
-      bait — open a loop, do not close it.
+    - The HOOK names NO countries, NO ranks, NO numbers. It is a short
+      simple question (≤10 words) about the TOPIC of the data — derived
+      from `metric_label` and `video_title` — phrased in plain words a
+      10-year-old understands. Forbidden words in the hook: "bars",
+      "chart", "race", "leaderboard", "data", "ranking", "graph", "stats".
     - The MIDDLE may only describe what happens inside its year window
       (`section_year_ranges.middle`). It MUST NOT name the eventual winner,
       MUST NOT quote any final-year value, MUST NOT say "ends up at #X" or
@@ -473,15 +372,12 @@ for ONE OR MORE beats so a human editor can pick the best combo.
 - HARD BAN: never start a hook with "POV:" — overused, banned. Also never
   use written-abbreviation slang ("fr", "ngl", "no cap", "deadass", "lowkey",
   "tbh", "idk", "smh", etc.) — write the full words instead.
-- Variety across hook options: rotate the slang and the opening syntax.
-  One can be a "tell me why", one can be a flat ironic question, one can
-  be ALL CAPS, one can be a "wait …" cold-open, etc. Don't emit five
-  "guess how much" variants and don't reuse the same opener twice.
 
 # Output
 Call the `emit_variants` tool exactly once with one array field per requested
-section (`hooks`, `middles`, `endings`). Omit arrays for sections you were not
-asked to produce. Do not output prose outside the tool call.
+section (`hooks`, `middles`, `endings`); each array holds exactly one option.
+Omit arrays for sections you were not asked to produce. Do not output prose
+outside the tool call.
 """
 
 
@@ -497,17 +393,17 @@ VARIANTS_TOOL = {
         "properties": {
             "hooks": {
                 "type": "array",
-                "description": "Opening-question snippets (beat 1). 5 options.",
+                "description": "Opening-question snippet (beat 1). Exactly one option.",
                 "items": {"type": "string"},
             },
             "middles": {
                 "type": "array",
-                "description": "Turn snippets (beat 2). 3 options. Each must contain the one broadcaster cut-in sentence.",
+                "description": "Turn snippet (beat 2). Exactly one option. Must contain the one broadcaster cut-in sentence.",
                 "items": {"type": "string"},
             },
             "endings": {
                 "type": "array",
-                "description": "Payoff snippets (beat 3). 3 options. Land the final RANKING from stat_pack — NO dollar values or numeric figures (the ticker on screen handles numbers).",
+                "description": "Payoff snippet (beat 3). Exactly one option. Land the final RANKING from stat_pack — NO dollar values or numeric figures (the ticker on screen handles numbers).",
                 "items": {"type": "string"},
             },
         },
@@ -570,6 +466,9 @@ def _build_variant_payload(*, stat_pack: dict, timeline: dict,
     section_year_ranges = _compute_section_year_ranges(
         timeline, speech_window)
     value_mode = narration_cfg.get("value_mode", "total")
+    metric_label = (narration_cfg.get("trend_label")
+                    or narration_cfg.get("video_title")
+                    or "the metric on screen")
     user_payload = {
         "tone": tone,
         "words_per_second": wps,
@@ -580,6 +479,8 @@ def _build_variant_payload(*, stat_pack: dict, timeline: dict,
         "section_year_ranges": section_year_ranges,
         "value_mode": value_mode,
         "value_mode_note": _value_mode_note(value_mode),
+        "metric_label": metric_label,
+        "video_title": narration_cfg.get("video_title", ""),
         "year_to_seconds_map": timeline["year_to_seconds"],
         "events": timeline["events"],
         "stat_pack": stat_pack,
@@ -642,9 +543,9 @@ def generate_variants(*, stat_pack: dict, timeline: dict,
     )
 
     doc = {
-        "hooks": _pad_or_trim([s.strip() for s in emitted.get("hooks", [])], 5),
-        "middles": _pad_or_trim([s.strip() for s in emitted.get("middles", [])], 3),
-        "endings": _pad_or_trim([s.strip() for s in emitted.get("endings", [])], 3),
+        "hooks": _pad_or_trim([s.strip() for s in emitted.get("hooks", [])], SECTION_COUNTS["hook"]),
+        "middles": _pad_or_trim([s.strip() for s in emitted.get("middles", [])], SECTION_COUNTS["middle"]),
+        "endings": _pad_or_trim([s.strip() for s in emitted.get("endings", [])], SECTION_COUNTS["ending"]),
         "meta": {
             "generated_at": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
             "model": model,

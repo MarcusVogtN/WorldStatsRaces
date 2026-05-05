@@ -24,6 +24,34 @@ import imageio.plugins.ffmpeg as _ffmpeg_plugin
 _FFMPEG_EXE = _ffmpeg_plugin.get_exe()
 
 
+def _probe_audio_seconds(audio_path: Path) -> float:
+    """Return audio duration in seconds by decoding via ffmpeg to /dev/null
+    and parsing the final `time=HH:MM:SS.ss` line from stderr. We don't
+    require ffprobe — only the imageio-bundled ffmpeg binary."""
+    proc = subprocess.run(
+        [_FFMPEG_EXE, "-hide_banner", "-nostats", "-i", str(audio_path),
+         "-f", "null", "-"],
+        capture_output=True, text=True, check=False,
+    )
+    last_t: float | None = None
+    for line in (proc.stderr or "").splitlines():
+        idx = line.rfind("time=")
+        if idx == -1:
+            continue
+        token = line[idx + 5:].split()[0]
+        try:
+            h, m, s = token.split(":")
+            last_t = int(h) * 3600 + int(m) * 60 + float(s)
+        except ValueError:
+            continue
+    if last_t is None:
+        raise RuntimeError(
+            f"Could not probe duration of {audio_path}. ffmpeg stderr: "
+            + (proc.stderr or "").strip()[-400:]
+        )
+    return last_t
+
+
 def _script_hash(text: str, voice_id: str, model_id: str) -> str:
     h = hashlib.sha256()
     h.update(text.encode("utf-8"))
@@ -34,14 +62,11 @@ def _script_hash(text: str, voice_id: str, model_id: str) -> str:
     return h.hexdigest()[:16]
 
 
-def synthesize(*,
-               script_doc: dict,
-               narration_cfg: dict,
-               video_duration_seconds: float,
-               clips_dir: Path,
-               out_wav_path: Path,
-               repo_root: Path) -> Path:
-    """Synthesize one continuous voice track, then mix with background music."""
+def synthesize_voice(*,
+                     script_doc: dict,
+                     narration_cfg: dict,
+                     clips_dir: Path) -> tuple[Path, float]:
+    """ElevenLabs TTS only. Returns (voice_mp3_path, voice_seconds)."""
     api_key = os.environ.get("ELEVENLABS_API_KEY")
     if not api_key:
         raise RuntimeError(
@@ -85,6 +110,18 @@ def synthesize(*,
     else:
         print(f"[narration] voice track cached: {voice_mp3.name}")
 
+    voice_seconds = _probe_audio_seconds(voice_mp3)
+    print(f"[narration] voice duration: {voice_seconds:.2f}s")
+    return voice_mp3, voice_seconds
+
+
+def mix_voice_with_music(*,
+                         voice_mp3: Path,
+                         narration_cfg: dict,
+                         video_duration_seconds: float,
+                         out_wav_path: Path,
+                         repo_root: Path) -> Path:
+    """Mix the synthesized voice with background music to a fixed duration."""
     _mix_with_music(
         voice_mp3=voice_mp3,
         music_cfg=narration_cfg.get("background_music", {}) or {},
@@ -92,16 +129,11 @@ def synthesize(*,
         out_wav_path=out_wav_path,
         duration_s=float(video_duration_seconds),
     )
-
-    # Write a small manifest for debugging.
     manifest_path = out_wav_path.with_suffix(".manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump({
-            "voice_id": voice_id,
-            "model_id": model_id,
             "voice_mp3": voice_mp3.name,
             "duration_seconds": float(video_duration_seconds),
-            "script_text": script_text,
         }, f, ensure_ascii=False, indent=2)
     return out_wav_path
 

@@ -162,8 +162,7 @@ def run(config_path: Path, *, refetch: bool = False,
     # ── Assets ───────────────────────────────────────────────────────────────
     provider = build_provider(asset_cfg, cache_dir)
     # Fetch flags for every country we have an icon id for, so the spotlight
-    # (which surfaces non-top-N movers) never renders text-only. top_n_to_fetch
-    # is kept as a lower bound but no longer caps the set.
+    # (which surfaces non-top-N movers) never renders text-only.
     final = result.data.iloc[-1].dropna().sort_values(ascending=False)
     ranked_all = [c for c in final.index if c in result.icon_ids]
     extra = [c for c in result.icon_ids.keys() if c not in ranked_all]
@@ -208,6 +207,7 @@ def run(config_path: Path, *, refetch: bool = False,
             if not variants.get(key):
                 raise SystemExit(f"--auto-assemble: variants.json has no '{key}' options.")
         narration_cfg = (cfg.get('render') or {}).get('narration') or {}
+        _archive_narration(cache_dir)
         write_narration_json(
             hook=variants['hooks'][0],
             middle=variants['middles'][0],
@@ -226,13 +226,19 @@ def run(config_path: Path, *, refetch: bool = False,
         from .narration.stats import build_stat_pack
         from .narration.timeline import build_timeline
         from .narration.script import (
-            generate_script as _generate_script,
             generate_variants as _generate_variants,
             regenerate_section as _regenerate_section,
         )
-        from .narration.voice import synthesize
+        from .narration.voice import synthesize_voice, mix_voice_with_music
 
         narration_cfg = dict(render_cfg.get('narration', {}))
+        narration_cfg['video_title'] = title
+        if per_capita and render_cfg.get('trend_label_per_capita'):
+            narration_cfg['trend_label'] = render_cfg.get('trend_label_per_capita')
+        elif accumulated and render_cfg.get('trend_label_accumulated'):
+            narration_cfg['trend_label'] = render_cfg.get('trend_label_accumulated')
+        else:
+            narration_cfg['trend_label'] = render_cfg.get('trend_label')
         if accumulated and per_capita:
             mode = 'cumulative per capita'
         elif accumulated:
@@ -291,50 +297,59 @@ def run(config_path: Path, *, refetch: bool = False,
             )
             return
 
-        # If --auto-assemble already wrote narration.json with source=auto,
-        # honor that exact script instead of regenerating.
+        # narration.json must be pre-assembled by --auto-assemble (which picks
+        # variant 0 from each section). The standalone single-call script
+        # generator was removed — auto-assemble is the only supported flow.
         narration_json_path = cache_dir / 'narration.json'
-        pre_assembled = False
-        script_doc: dict | None = None
-        if narration_json_path.exists():
-            try:
-                existing = json.loads(narration_json_path.read_text(encoding='utf-8'))
-                meta = existing.get('meta') or {}
-                if meta.get('source') == 'auto' and existing.get('script_text'):
-                    pre_assembled = True
-                    script_doc = existing
-                    print(f"[narration] using pre-assembled script_text "
-                          f"(source=auto) from {narration_json_path} "
-                          f"(skipping LLM regeneration).")
-            except (OSError, json.JSONDecodeError):
-                pass
-
-        if not pre_assembled:
-            _archive_narration(cache_dir)
-            script_doc = _generate_script(
-                stat_pack=stat_pack,
-                timeline=timeline,
-                narration_cfg=narration_cfg,
-                out_path=narration_json_path,
-            )
-        if script_doc.get('suggested_trim'):
-            st = script_doc['suggested_trim']
-            print(f"[narration] suggested_trim: start_year={st.get('start_year')} "
-                  f"— {st.get('reason')} (not applied; update config.json manually)")
+        if not narration_json_path.exists():
+            raise SystemExit(
+                f"--generate-narration: {narration_json_path} not found. "
+                "Run `--generate-variants` then `--auto-assemble` first.")
+        existing = json.loads(narration_json_path.read_text(encoding='utf-8'))
+        meta = existing.get('meta') or {}
+        if meta.get('source') != 'auto' or not existing.get('script_text'):
+            raise SystemExit(
+                f"--generate-narration: {narration_json_path} is not an "
+                "auto-assembled script (meta.source != 'auto'). Re-run "
+                "`--generate-variants` then `--auto-assemble`.")
+        script_doc = existing
+        print(f"[narration] using pre-assembled script_text "
+              f"(source=auto) from {narration_json_path}.")
 
         if generate_script and not generate_narration:
-            print("[narration] script-only mode — skipping ElevenLabs TTS to save credits.")
+            print("[narration] script-only mode — nothing to do (script is "
+                  "already in narration.json from --auto-assemble).")
             return
 
-        synthesize(
+        # --- New flow: TTS first, then size video to fit voice ----------
+        voice_mp3, voice_seconds = synthesize_voice(
             script_doc=script_doc,
             narration_cfg=narration_cfg,
-            video_duration_seconds=timeline['video_duration_seconds'],
             clips_dir=cache_dir / 'narration_clips',
-            out_wav_path=cache_dir / 'narration.wav',
-            repo_root=repo_root,
         )
-        return
+
+        tail_buffer = float(narration_cfg.get('tail_buffer_seconds', 1.5))
+        years = result.data.index.tolist()
+        year_count = max(2, len(years))
+        # n_frames produced by interpolate_and_rank = (year_count-1)*spy + 1
+        # Target body length in frames: voice_seconds * fps
+        target_body_frames = max(int(round(voice_seconds * fps)), year_count)
+        spy_override = max(2, int(round((target_body_frames - 1) / (year_count - 1))))
+        render_cfg['steps_per_year'] = spy_override
+        render_cfg['end_hold_seconds'] = tail_buffer
+        # Stash voice info so the post-render block can mix + mux
+        render_cfg['_pending_voice_mp3'] = voice_mp3
+        render_cfg['_pending_voice_seconds'] = voice_seconds
+        render_cfg['_pending_narration_cfg'] = narration_cfg
+        render_cfg['_pending_mux'] = True
+        # Recompute body seconds with the override for logging
+        new_body_s = ((year_count - 1) * spy_override + 1) / fps
+        new_total_s = new_body_s + tail_buffer
+        print(f"[narration] timing fit: voice={voice_seconds:.2f}s, "
+              f"steps_per_year {steps_per_year}→{spy_override}, "
+              f"body≈{new_body_s:.2f}s, end_hold={tail_buffer:.2f}s, "
+              f"total≈{new_total_s:.2f}s")
+        # Fall through to render block
 
     # ── Mux narration onto rendered video and exit ───────────────────────
     if mux_narration:
@@ -390,3 +405,52 @@ def run(config_path: Path, *, refetch: bool = False,
         single_frames_dir=(cache_dir / 'preview_frames'
                            if resolved_preview_years is not None else None),
     )
+
+    # ── Voice mix + auto-mux when --generate-narration kicked us here ───
+    if not is_single_frame and render_cfg.get('_pending_mux'):
+        from .narration.mux import mux_audio
+        voice_mp3 = render_cfg['_pending_voice_mp3']
+        voice_seconds = float(render_cfg['_pending_voice_seconds'])
+        narration_cfg = render_cfg['_pending_narration_cfg']
+        tail_buffer = float(narration_cfg.get('tail_buffer_seconds', 1.5))
+        # Total video duration after render = body + end_hold (set above to tail_buffer)
+        year_count = max(2, len(result.data.index))
+        spy = int(render_cfg['steps_per_year'])
+        body_s = ((year_count - 1) * spy + 1) / fps
+        total_s = body_s + tail_buffer
+        mix_voice_with_music(
+            voice_mp3=voice_mp3,
+            narration_cfg=narration_cfg,
+            video_duration_seconds=total_s,
+            out_wav_path=cache_dir / 'narration.wav',
+            repo_root=repo_root,
+        )
+        video_path = output_dir / output_name
+        stem = Path(output_name).stem
+        ext = Path(output_name).suffix or '.mp4'
+        narrated_path = output_dir / f'{stem}_narrated{ext}'
+        mux_audio(video_path, cache_dir / 'narration.wav', narrated_path)
+        print(f"[narration] tail (post-voice) ≈ {total_s - voice_seconds:.2f}s")
+
+    # ── Manifest sidecar (skip for preview-only runs) ────────────────────────
+    if not is_single_frame:
+        from .youtube import manifest as _manifest
+        _manifest.write(
+            channel='world',
+            output_path=output_dir / output_name,
+            cache_dir=cache_dir,
+            config_path=config_path,
+            config_snapshot=cfg,
+            render_cfg=render_cfg,
+            theme_name=cfg.get('theme', 'glass_dark'),
+            dataset={
+                'source_type': source_cfg.get('type'),
+                'indicator': source_cfg.get('indicator'),
+                'timeframe': source_cfg.get('timeframe'),
+            },
+            video_title=title,
+            transforms={'per_capita': per_capita,
+                        'accumulated': accumulated,
+                        'value_scale': value_scale},
+            source_credit=result.source_credit,
+        )
