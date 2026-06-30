@@ -26,9 +26,10 @@ def _yearly_from_scores(scores_df: pd.DataFrame, steps_per_year: int) -> pd.Data
     return yearly
 
 
-def _display_ranks(yearly: pd.DataFrame) -> pd.DataFrame:
-    """Display rank (1 = largest). NaN where value is NaN."""
-    return yearly.rank(axis=1, method='min', ascending=False)
+def _display_ranks(yearly: pd.DataFrame, invert: bool = False) -> pd.DataFrame:
+    """Display rank (1 = top of leaderboard). With invert=True, smaller values
+    rank higher (used for 'lowest wins' races)."""
+    return yearly.rank(axis=1, method='min', ascending=invert)
 
 
 def build_stat_pack(scores_df: pd.DataFrame,
@@ -37,9 +38,10 @@ def build_stat_pack(scores_df: pd.DataFrame,
                     steps_per_year: int,
                     value_format: str,
                     video_title: str,
-                    n_on_screen: int = 10) -> dict[str, Any]:
+                    n_on_screen: int = 10,
+                    invert_ranking: bool = False) -> dict[str, Any]:
     yearly = _yearly_from_scores(scores_df, steps_per_year)
-    ranks = _display_ranks(yearly)
+    ranks = _display_ranks(yearly, invert=invert_ranking)
     years = yearly.index.to_numpy()
     countries = list(yearly.columns)
 
@@ -53,8 +55,8 @@ def build_stat_pack(scores_df: pd.DataFrame,
             continue
         sub = yearly.iloc[mask]
         sub_total = sub.fillna(0).sum(axis=1)
-        top1_values = sub.max(axis=1)
-        top1_names = sub.idxmax(axis=1)
+        top1_values = sub.min(axis=1) if invert_ranking else sub.max(axis=1)
+        top1_names = sub.idxmin(axis=1) if invert_ranking else sub.idxmax(axis=1)
         share = float((top1_values / sub_total.replace(0, np.nan)).mean())
         dominant = top1_names.mode().iloc[0] if not top1_names.empty else None
         top_share_per_decade.append({
@@ -78,7 +80,7 @@ def build_stat_pack(scores_df: pd.DataFrame,
     }
 
     # ── Longest reign at rank 1 ─────────────────────────────────────────
-    top1_names = yearly.idxmax(axis=1)
+    top1_names = yearly.idxmin(axis=1) if invert_ranking else yearly.idxmax(axis=1)
     longest_reign = {'country': None, 'years': 0, 'start': None, 'end': None}
     if len(top1_names):
         cur_country = top1_names.iloc[0]
@@ -224,7 +226,7 @@ def build_stat_pack(scores_df: pd.DataFrame,
     # mid-year value, not the true year-end. For the payoff line we want
     # the exact year-end value, so use scores_df.iloc[-1].
     final_year = int(round(float(scores_df.index[-1])))
-    final_row = scores_df.iloc[-1].dropna().sort_values(ascending=False)
+    final_row = scores_df.iloc[-1].dropna().sort_values(ascending=invert_ranking)
     final_standings: list[dict[str, Any]] = []
     for rank_idx, (country, value) in enumerate(final_row.head(n_on_screen).items(), start=1):
         final_standings.append({
@@ -237,7 +239,7 @@ def build_stat_pack(scores_df: pd.DataFrame,
 
     # ── First-year standings (top-N) ────────────────────────────────────
     first_year = int(round(float(scores_df.index[0])))
-    first_row = scores_df.iloc[0].dropna().sort_values(ascending=False)
+    first_row = scores_df.iloc[0].dropna().sort_values(ascending=invert_ranking)
     first_standings: list[dict[str, Any]] = []
     for rank_idx, (country, value) in enumerate(first_row.head(n_on_screen).items(), start=1):
         first_standings.append({

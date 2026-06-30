@@ -57,11 +57,11 @@ a soccer-fan audience.
    overrides). Defer aggressive simplification of this surface until the
    production template is locked.
 8. Support intro animations (back-ease-out bounce on title, rows, trend line).
-9. Offer auto-sizing of the name-box per video to fit the longest entity
-   that ever lands in the visible top-N
-   (`races/render/layout.py::auto_size_columns`). Pipelines opt in — the
-   sports pipeline calls it; the world pipeline uses fixed columns because
-   country names are short enough not to need it.
+9. Auto-size the name-box per video to fit the longest entity that ever
+   lands in the visible top-N
+   (`races/render/layout.py::auto_size_columns`). Both pipelines call it
+   so long country names (e.g. "Bosnia and Herzegovina") and footballer
+   rosters render without truncation.
 
 ### Pipeline orchestration
 10. Per-capita transform (divide indicator by population). World-stats only.
@@ -87,6 +87,22 @@ a soccer-fan audience.
 ### Narration
 19. Generate LLM scripts (Anthropic) with stat-pack + frame-keyed event
     timeline so phrasing aligns with what's on screen.
+
+    **Music-duration constraint:** the final narrated video may be **shorter
+    than** the configured background music file, but must never be **longer**.
+    The mix loops music when the video exceeds it, which sounds wrong —
+    cap voice length (and therefore body length) so total = body +
+    `tail_buffer_seconds` ≤ music duration. Shorter is fine; longer is a bug.
+
+    The current background music
+    (`races/assets/music/Bar_Chart_Race_Tension_2026-04-20T113611.mp3`) has
+    been trimmed to **47.0s**. Keep narrated videos using this track ≤47s
+    total (voice ≤ ~45.5s with the default 1.5s `tail_buffer_seconds`).
+    Do NOT speed up voice with `atempo` to fit — generate a script short
+    enough that natural-speed TTS lands inside the budget. If a script
+    overruns, re-roll variants with a tighter word budget
+    (lower `max_speech_coverage` in `render.narration`) rather than
+    post-processing the audio.
 20. Generate one variant per beat (hook, middle, ending) via
     `--generate-variants`. On-demand re-rolls via `--regenerate-section`.
 21. Synthesize TTS via ElevenLabs with per-clip SHA256 caching for cost
@@ -102,6 +118,16 @@ a soccer-fan audience.
 ### Big-mover curation
 26. Extract candidate big-mover events to `cache/big_movers.json` for review;
     render only events with `keep:true` when a curated file is configured.
+
+    **Currently broken — do not curate.** The spotlight render path that
+    surfaces curated events is disabled in both channel configs
+    (`spotlight.enabled: false`) because the system is broken (see
+    `post-dumb-minimized-audit.md`). Skills MUST skip the
+    `--extract-movers` step and MUST NOT edit `cache/big_movers.json::keep`
+    flags until the spotlight is fixed. Setting keeps today does nothing
+    visible — it only adds noise to the narration timeline. The
+    `make-world-stats-video` / `make-sports-stats-video` skills should
+    proceed directly from layout-check to `--generate-variants`.
 
 ### Posting and feedback
 27. Auto-post finished videos to YouTube via the Data API (`--upload`).
@@ -154,14 +180,22 @@ Before adding a new behavior, run through these checks:
 
 Known gaps that don't justify work today but should not be forgotten:
 
-- **Sports CLI narration parity.** `run.py --channel sports` only exposes
-  `--preview-frame[s]` and `--validate-layout`. The narration surface
-  (`--generate-variants`, `--auto-assemble`, `--generate-narration`,
-  `--regenerate-section`) and `--refetch` / `--extract-movers` are
-  world-only. v1 sports videos are music-only as a result. When the sports
-  channel needs LLM narration or scripted re-fetching, extend the sports
-  branch in `run.py::main` and the `sportstatsraces.pipeline.run` signature
-  to accept the same flags as the world pipeline.
+- **Sports `--refetch` plumbing.** `run.py --channel sports` doesn't yet
+  expose a `--refetch` that re-runs the fbref scraper end-to-end. Today the
+  scraper is invoked manually
+  (`python -m sportstatsraces.scrapers.fetch_pl_seasons [--refresh-current]
+  [--fetch-headshots]`). When the data cadence demands automation, wire a
+  sports `--refetch` flag into the sports branch of `run.py::main` and the
+  `sportstatsraces.pipeline.run` signature.
+- **Sports-specific background music.** Sports videos currently reuse the
+  world-stats track (`races/assets/music/Bar_Chart_Race_Tension_*.mp3`,
+  trimmed to 47.0s) as placeholder. Source a stadium-drums / hype-builder
+  track and point `sportstatsraces/config.json::render.narration.background_music.path`
+  at it. Same 47s duration cap applies.
+- **Sports spotlight.** Currently disabled in `sportstatsraces/config.json`
+  (and in world-stats too, since the spotlight system is broken — see
+  `post-dumb-minimized-audit.md`). Re-enable for sports only after the
+  world-stats spotlight fix lands.
 
 ---
 
@@ -198,6 +232,8 @@ worldbankraces/
 │   ├── config.json           sports-stats config
 │   ├── sources/              FbrefPLSource (extendable)
 │   ├── assets/               HeadshotProvider
+│   ├── narration/            sports stat-pack + prompts (reuses races/
+│   │                         narration script/voice/mux/assemble/timeline)
 │   └── scrapers/             fbref season + headshot scrapers
 ├── cache/                    gitignored — fetched data, fonts, narration takes
 │   ├── analytics.db          gitignored — SQLite store for YouTube metrics

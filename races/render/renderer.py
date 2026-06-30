@@ -451,6 +451,7 @@ def render(data: pd.DataFrame,
     smooth_a = render_cfg.get('rank_smooth_window_a', 25)
     smooth_b = render_cfg.get('rank_smooth_window_b', 35)
     row_min_weight = render_cfg.get('row_min_weight', 0.35)
+    layout_baseline = float(render_cfg.get('value_layout_baseline', 0.0) or 0.0)
     show_total_trend = render_cfg.get('show_total_trend', True)
     trend_label = render_cfg.get('trend_label', 'Total — all countries')
     flag_corner_radius_frac = render_cfg.get('flag_corner_radius_frac', 0.14)
@@ -478,7 +479,10 @@ def render(data: pd.DataFrame,
     race_height = vertical.race_height
 
     print('Preparing frames...')
-    scores_df, ranks_df = interpolate_and_rank(data, steps_per_year, smooth_a, smooth_b)
+    scores_df, ranks_df = interpolate_and_rank(
+        data, steps_per_year, smooth_a, smooth_b,
+        invert=bool(render_cfg.get('invert_ranking', False)))
+    invert_ranking = bool(render_cfg.get('invert_ranking', False))
     country_colors = assign_colors(data.columns, theme.accent_palette)
 
     # Per-row rate ("goals over the last N steps") and retirement detection.
@@ -687,6 +691,27 @@ def render(data: pd.DataFrame,
         max_val = float(scores.max())
         if not np.isfinite(max_val) or max_val <= 0:
             return
+        # Effective values for layout (weight + track position). Subtracting
+        # a baseline compresses tightly-clustered datasets (e.g. heights
+        # 160-184cm) so bar widths and row heights show visible variation.
+        # In invert mode the baseline is the upper clip and eff = baseline - v
+        # (smaller original values produce larger bars). Display values
+        # are unchanged in either mode.
+        if invert_ranking:
+            min_val = float(scores.min())
+            eff_max = max(layout_baseline - min_val, 1e-9)
+
+            def eff(v: float) -> float:
+                if not np.isfinite(v):
+                    return 0.0
+                return max(layout_baseline - v, 0.0)
+        else:
+            eff_max = max(max_val - layout_baseline, 1e-9)
+
+            def eff(v: float) -> float:
+                if not np.isfinite(v):
+                    return 0.0
+                return max(v - layout_baseline, 0.0)
 
         state['frame'] += 1
         t_ease = smoothstep(min(1.0, state['frame'] / 50))
@@ -732,7 +757,7 @@ def render(data: pd.DataFrame,
             v = float(scores[c])
             if not np.isfinite(v) or v <= 0:
                 return row_min_weight
-            return max(row_min_weight, v / max_val)
+            return max(row_min_weight, eff(v) / eff_max)
 
         # Normalization denominator: the *true* top-N by smoothed rank, drawn
         # from all countries (not the entry-fade subset). Slicing top_n out of
@@ -890,7 +915,7 @@ def render(data: pd.DataFrame,
                 draw_w = 0.0
 
             fx = track_position(
-                value, max_val,
+                eff(value), eff_max,
                 columns.track_left, columns.track_right,
                 draw_w,
             )
@@ -924,7 +949,7 @@ def render(data: pd.DataFrame,
             draw_h_final = (card_h_i / race_intro_scale) * 0.96 if race_intro_scale > 0 else draw_h
             draw_w_final = draw_h_final * (iw / ih) * (FIG_H_PX / FIG_W_PX) if icon is not None else 0.0
             fx_final = track_position(
-                value, max_val,
+                eff(value), eff_max,
                 columns.track_left, columns.track_right,
                 draw_w_final,
             )

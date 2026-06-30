@@ -34,6 +34,31 @@
     "row_rate_window_years": 1.0,
     "row_rate_label": "/SZN",
     "row_retired_label": "RETIRED",
-    "font_scale": 1.0
+    "font_scale": 1.0,
+    "narration": {
+      "enabled": true,
+      "model": "claude-opus-4-7",
+      "system_prompt_module": "sportstatsraces.narration.prompts",
+      "tts": {
+        "provider": "elevenlabs",
+        "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+        "model_id": "eleven_turbo_v2_5",
+        "stability": 0.25,
+        "style": 1.0,
+        "similarity_boost": 0.8,
+        "speed": 1.05
+      },
+      "tone": "pub mate watching the football with you, wired, online, can't believe what they're seeing",
+      "words_per_second": 3.0,
+      "max_speech_coverage": 0.62,
+      "tail_buffer_seconds": 1.5,
+      "background_music": {
+        "path": "races/assets/music/Bar_Chart_Race_Tension_2026-04-20T113611.mp3",
+        "voice_volume_db": 0.0,
+        "music_volume_db": -18.0,
+        "fade_in_seconds": 0.5,
+        "fade_out_seconds": 1.5
+      }
+    }
   }
 }

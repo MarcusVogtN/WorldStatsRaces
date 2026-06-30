@@ -24,10 +24,20 @@ CATEGORY_BY_CHANNEL = {
 }
 
 
+def _youtube_overrides(m: dict) -> dict:
+    """Optional `youtube` block from the config snapshot, letting a video set
+    its own YouTube title/tags (which can differ from the on-screen title and
+    the country-default tags). Absent → {}."""
+    return (m.get('config_snapshot') or {}).get('youtube') or {}
+
+
 def _build_title(m: dict) -> str:
-    """Generate a draft title from the manifest. You'll edit in Studio
-    before promoting from private to public — this is just a placeholder
-    that beats the filename."""
+    """Generate a draft title. A config `youtube.title` override wins;
+    otherwise fall back to the on-screen video title. You can still edit in
+    Studio before promoting from private to public."""
+    override = _youtube_overrides(m).get('title')
+    if override:
+        return override[:100]
     return (m.get('video_title') or m.get('output_stem') or 'Race')[:100]
 
 
@@ -38,7 +48,8 @@ def _build_description(m: dict) -> str:
     if script:
         parts.append(script.strip())
     if m.get('source_credit'):
-        parts.append(f"Source: {m['source_credit']}")
+        # source_credit already carries its own "Source: " prefix.
+        parts.append(m['source_credit'])
     parts.append('#shorts')
     return ('\n\n'.join(parts))[:5000]
 
@@ -58,7 +69,14 @@ _DEFAULT_TAGS_BY_CHANNEL = {
 
 def _build_tags(m: dict, channel: str) -> list[str]:
     """Generate a sensible default tag list. YouTube caps total tag string
-    length at ~500 chars; we stay well under by capping at 12 tags."""
+    length at ~500 chars; we stay well under by capping at 12 tags.
+
+    A config `youtube.tags` override replaces the channel defaults entirely —
+    needed for non-country datasets (e.g. baby names) where the country tags
+    don't fit."""
+    override = _youtube_overrides(m).get('tags')
+    if override:
+        return list(override)[:12]
     base = list(_DEFAULT_TAGS_BY_CHANNEL.get(channel, ['shorts']))
     # Mine the title for natural-language tags too.
     title = (m.get('video_title') or '').lower()

@@ -1,122 +1,132 @@
-# Dataset ideas for World Bank race videos
+# Dataset ideas for race videos
 
-The pipeline (`run.py` + `races/`) accepts any World Bank indicator via `config.json::source.indicator`, with three render modes:
+Re-ranked around **virality**, not data category. The pipeline accepts any
+source that yields a Year×entity matrix; it is no longer World-Bank-only:
 
-- **Total** — country-level absolute values. Good for "who's biggest" stories.
-- **`per_capita: true`** — divides by `SP.POP.TOTL`. Good for "fair fight" stories where small countries can win.
-- **`accumulated: true`** — running cumsum across the timeframe. Good for "stock vs flow" stories (cumulative emissions, cumulative aid).
+- `world_bank` — country indicators (flags). `config.json::source.indicator`.
+- `csv` — any tidy country CSV (flags), e.g. OWID/WHO exports.
+- `ssa_names` — US baby names (letter avatars). `source.sex` = `F`|`M`.
+- New entity types plug in via a `DataSource` + an `AssetProvider`
+  (`letter` avatars need no art; `flags` for countries).
 
-A good chart-race needs: (1) a long enough timeframe for rank churn (≥40 years ideal), (2) at least one dramatic story beat the audience already half-knows (USSR collapse, China's rise, 2008, COVID, oil shocks), and (3) a winner that isn't obvious from frame 1.
-
----
-
-## 1. Money & power
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **GDP race** | `NY.GDP.MKTP.CD` | total | The classic. China overtaking Japan (2010) and closing on the US is the spine. |
-| **GDP per capita** | `NY.GDP.PCAP.CD` | per_capita | Tiny rich countries dominate (Luxembourg, Qatar, Switzerland). Flags rotate constantly. |
-| **Foreign exchange reserves** | `FI.RES.TOTL.CD` | total | China's reserves explosion post-2000 is jaw-dropping. Japan, Switzerland, Saudi rotate. |
-| **External debt stocks** | `DT.DOD.DECT.CD` | total | Developing-country debt story. Argentina/Turkey/Brazil drama. |
-| **Inflation, consumer prices** | `FP.CPI.TOTL.ZG` | total (rate) | Hyperinflation parade — Zimbabwe, Venezuela, Argentina. Chaotic, gets attention. |
-| **Remittances received** | `BX.TRF.PWKR.CD.DT` | total | India + Mexico + Philippines fight. Per-capita flips it to small islands (Tonga, Tajikistan). |
-
-## 2. People
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **Population** | `SP.POP.TOTL` | total | Slow but powerful — China vs India crossover (~2023) is the climax. |
-| **Urban population** | `SP.URB.TOTL` | total | China's urbanization is the story; B-side to the population race. |
-| **Life expectancy** | `SP.DYN.LE00.IN` | total (rate) | Japan dominates; Soviet collapse visible as a *drop* in Russia. COVID dip in 2020–21. |
-| **Net migration** | `SM.POP.NETM` | total | Volatile, signed values — would need rendering tweaks. |
-| **Refugees by country of asylum** | `SM.POP.REFG` | total | Pakistan / Iran / Turkey / Germany shifts — each spike maps to a war. |
-
-## 3. Tech & innovation
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **Internet users (% pop)** | `IT.NET.USER.ZS` | total (%) | The 1995→2020 climb. Iceland / Nordics dominate early; Gulf states leapfrog. |
-| **Mobile cellular subscriptions** | `IT.CEL.SETS` | total | China + India pull away post-2005. Per-capita: UAE, HK weirdness (>200%). |
-| **Patent applications, residents** | `IP.PAT.RESD` | total | Japan dominates 80s–00s, then China overtakes everyone in the 2010s. Strong arc. |
-| **R&D expenditure (% GDP)** | `GB.XPD.RSDV.GD.ZS` | total (rate) | Israel + South Korea lead; "small countries punching up" story. |
-| **High-tech exports ($)** | `TX.VAL.TECH.CD` | total | China's rise is brutal; Germany / Japan / US fight for second. |
-
-## 4. Energy & climate
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **CO2 emissions** | `EN.ATM.CO2E.KT` | total + accumulated | **Two videos.** Total = current race (China #1 since 2006). Accumulated = "who actually caused this" — US dwarfs everyone for decades. The contrast is the point. |
-| **CO2 per capita** | `EN.ATM.CO2E.PC` | per_capita | Qatar, Trinidad, Kuwait dominate — flips the climate narrative. |
-| **Renewable energy share** | `EG.FEC.RNEW.ZS` | total (rate) | Africa + Nordics on top for different reasons; Iceland/Norway/Costa Rica visible. |
-| **Energy use per capita** | `EG.USE.PCAP.KG.OE` | per_capita | Iceland, Qatar, Trinidad. Small population × heavy industry. |
-| **Forest area (km²)** | `AG.LND.FRST.K2` | total | Russia, Brazil, Canada, US, China — the Brazil decline post-2000 is grim and visible. |
-
-## 5. Trade & connectedness
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **Goods exports** | `NE.EXP.GNFS.CD` | total | China's takeoff post-WTO (2001). Germany's persistence. |
-| **FDI net inflows** | `BX.KLT.DINV.CD.WD` | total | Volatile — China, US, UK, then surprise hosts (Luxembourg, Ireland for tax reasons). |
-| **International tourism arrivals** | `ST.INT.ARVL` | total | France / Spain / US fight. COVID 2020 cliff is visceral. |
-| **Air transport, passengers carried** | `IS.AIR.PSGR` | total | Same COVID cliff, plus China's ascent. |
-| **Container port traffic (TEU)** | `IS.SHP.GOOD.TU` | total | Shorter timeframe (2000+), but China + Singapore + Korea is a clean story. |
-
-## 6. Health & education
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **Health expenditure per capita** | `SH.XPD.CHEX.PC.CD` | per_capita | US runs away with it — already a meme. The "and yet…" contrast is the hook. |
-| **Physicians per 1,000 people** | `SH.MED.PHYS.ZS` | total (rate) | Cuba, Greece, Georgia at top — counterintuitive winners. |
-| **Government education spending (% GDP)** | `SE.XPD.TOTL.GD.ZS` | total (rate) | Cuba, Nordics, Saudi at various points. |
-| **Out-of-pocket health spending (% of total)** | `SH.XPD.OOPC.CH.ZS` | total (rate) | Inverse story — winners are "worst" outcomes. Sudan, Nigeria, Bangladesh climb. |
-
-## 7. Conflict & security (siblings to the military spending video)
-
-| Idea | Indicator | Mode | Hook |
-|---|---|---|---|
-| **Military spending per capita** | `MS.MIL.XPND.CD` | per_capita | **Already shipped.** |
-| **Armed forces personnel** | `MS.MIL.TOTL.P1` | total | China + India + US + N. Korea + Russia. Different story than $ spending. |
-| **Arms exports (SIPRI via WB)** | `MS.MIL.MEXP.UN` | total | US / Russia / France / China oligopoly; cumulative version is wild. |
-| **Military spending (% of GDP)** | `MS.MIL.XPND.GD.ZS` | total (rate) | Saudi, Israel, Oman, Singapore at the top. Reframes "who cares most." |
+**What actually goes viral** (learned the hard way — macro country races are a
+saturated genre):
+1. **Relatability** — the viewer is *in* the data (their name, their city,
+   their decade, their vice). Beats "Luxembourg GDP per capita" every time.
+2. **Churn** — the lead must change hands. Flat #1 = dead video.
+3. **A known story beat** the audience half-remembers (USSR collapse, 2008,
+   COVID, the rise of TikTok).
+4. **A counterintuitive reveal** — the "wait, what?" that earns the comment.
 
 ---
 
-## Top 5 if you want a shortlist
+## Tier S — purple cows (new entity types / fresh sources)
 
-1. **CO2 emissions — accumulated** (moral-accounting twist; pairs with a total-emissions video as a duo)
-2. **GDP per capita** (always-shifting flags; Luxembourg/Qatar/Norway story)
-3. **Foreign exchange reserves** (China's rise is unmissable; one-clear-villain narrative)
-4. **Patents (residents)** (Japan→China handoff is a cleaner arc than GDP itself)
-5. **International tourism arrivals** (built-in COVID cliff)
+These don't look like every other chart-race channel. Highest priority.
+
+| Idea | Source | Asset | Hook |
+|---|---|---|---|
+| **Baby girl names (US)** | `ssa_names` F | letter | **SHIPPED.** Mary 7.8%→ top name 1.1%: dominance collapses into a free-for-all. |
+| **Baby boy names (US)** | `ssa_names` M | letter | **RENDERED** (awaiting upload). John's ~40yr reign → Michael → Liam/Noah; 8%→1.3% collapse. Less churn than girls but the long reigns land. |
+| **Most populous cities (world)** | Chandler/UN historical urban pop CSV | letter/text | Babylon→Rome→Beijing→London→NYC→Tokyo→Delhi. "Your city" hook, centuries of churn, almost nobody races *cities*. |
+| **Biggest companies by market cap** | companiesmarketcap / stooq CSV | letter (logos later) | Tribal (Apple/MSFT/Aramco/Nvidia). The Nvidia 2023–24 vertical takeoff is a built-in jaw-drop. |
+| **Social platforms by monthly users** | hand-built CSV (annual reports) | letter | MySpace→Facebook→Instagram→TikTok. Small CSV, huge nostalgia, clean villain-rotation. |
+| **Olympic gold medals (cumulative)** | Kaggle 120-yrs Olympic history CSV | flags | Recurring event hook every 2 yrs; USA/USSR/China arc; `accumulated` mode. |
+| **Highest-grossing movies / franchises** | Box Office Mojo CSV | letter (posters later) | Titanic→Avatar→Avengers. Pop-culture relatability; argument bait. |
+| **Most popular dog breeds (US)** | AKC annual registrations CSV | letter | Cocker→Lab→Frenchie. Wholesome, shareable, "what happened to the Rottweiler?" |
+
+## Tier A — country races worth keeping (flags, WB/CSV)
+
+Strongest of the macro set: real churn + a story everyone half-knows.
+
+| Idea | Indicator / source | Mode | Hook |
+|---|---|---|---|
+| **GDP** | `NY.GDP.MKTP.CD` | total | China overtakes Japan (2010), closes on US. The spine. |
+| **CO₂ — total *and* accumulated** | `EN.ATM.CO2E.KT` | total + `accumulated` | Two-video combo: current emitter (China) vs who *caused* it (US). The contrast is the point. |
+| **Foreign-exchange reserves** | `FI.RES.TOTL.CD` | total | China's post-2000 explosion is unmissable; one clear protagonist. |
+| **Population** | `SP.POP.TOTL` | total | China↔India crossover (~2023) as the climax. |
+| **Life expectancy** | `SP.DYN.LE00.IN` | total | Soviet collapse = a visible *drop*; COVID dip 2020–21. |
+| **Patent applications (residents)** | `IP.PAT.RESD` | total | Japan→China handoff — a cleaner arc than GDP. |
+| **International tourism arrivals** | `ST.INT.ARVL` | total | Built-in COVID-2020 cliff; France/Spain/US fight. |
+| **Inflation, consumer prices** | `FP.CPI.TOTL.ZG` | rate | Hyperinflation parade (Zimbabwe/Venezuela/Argentina). Chaotic = attention. |
+| **Military spending** | `MS.MIL.XPND.CD` (total) / `…GD.ZS` (% GDP) | total/rate | Sibling to the shipped per-capita version; % GDP reframes "who cares most." |
+| **Remittances received** | `BX.TRF.PWKR.CD.DT` | total / per_capita | India/Mexico/Philippines; per-capita flips to tiny islands (Tonga). |
+| **External debt stocks** | `DT.DOD.DECT.CD` | total | Argentina/Turkey/Brazil drama. |
+
+## Tier B — relatable "vice & body" country races (OWID/WHO via `csv`)
+
+More clickable than macro money, but country-level so still flags. Need an
+OWID/WHO CSV download (no WB indicator). Verify timeframe/churn before render.
+
+| Idea | Source | Hook |
+|---|---|---|
+| **Obesity rate** | OWID/WHO | Pacific islands + Gulf + US; "is the US really #1?" reveal. |
+| **Alcohol consumption per capita** | WHO/OWID | Eastern Europe dominance; Russia/Moldova/Czechia. |
+| **Meat consumption per capita** | OWID | US/Argentina/Australia; China's climb. |
+| **Cigarettes / smoking** | OWID/WHO | Rise then fall — the decline arc is the story. |
+| **Internet users (% pop)** | `IT.NET.USER.ZS` | 1995→2020 climb; Nordics early, Gulf leapfrog. |
+| **World Happiness score** | World Happiness Report CSV | Nordic lock at top; short timeframe (2005+) is the weakness. |
+
+---
+
+## Removed / parked (and why)
+
+Pruned from the old list — low churn, redundant, or rendering headaches.
+Don't resurrect without a reason.
+
+- **Urban population, high-tech exports, energy use per capita, air transport
+  passengers** — redundant with population / patents / CO₂-per-capita /
+  tourism respectively.
+- **Out-of-pocket health spending, government education spending** — confusing
+  "worst-wins" inverse framing; weak hook.
+- **Net migration** — signed values need renderer work. Park until needed.
+- **FDI net inflows, mobile subscriptions, container port traffic** — too
+  volatile / >100% artifacts / timeframe too short. Park.
+- **R&D %, arms exports, armed-forces personnel, refugees, physicians,
+  forest area, goods exports, GDP per capita** — fine but mid; pull from here
+  only if a Tier S/A idea stalls. (Physicians + military-per-capita already
+  shipped.)
+
+# Saved drafts (rendered, awaiting review)
+
+- **Refugees by country of asylum** — `output/refugees_race_narrated.mp4`
+  (2026-05-12). User paused upload, wanted a lighter topic. Still valid.
 
 ---
 
 ## How to execute any of these
 
-Edit `config.json` only:
+**Country / WB idea:** edit `config.json` — `source.type:"world_bank"`,
+`source.indicator`, `source.timeframe`, `video_title`, `output_filename`,
+`per_capita`/`accumulated`, `trend_label`, `value_format`.
 
-1. `source.indicator` → the code from the table above.
-2. `source.timeframe` → most indicators have ~1960–2023 coverage; some (internet, container traffic) start later.
-3. `video_title` → human-readable title.
-4. `output_filename` → `<topic>_race.mp4`.
-5. `per_capita` / `accumulated` → match the recommended mode.
-6. `trend_label` (and `_per_capita` / `_accumulated` overrides) → label above the sparkline.
-7. `value_format` → `"currency"` for $-denominated, anything else for raw numbers.
+**Country CSV (OWID/WHO):** `source.type:"csv"`, `path`, `value_col`,
+`country_col`, `year_col`, `filters`, `timeframe`. Flags resolve via pycountry.
+
+**Baby names:** `source.type:"ssa_names"`, `source.sex:"F"|"M"`,
+`assets.type:"letter"`, `value_scale:100`, `value_format:"decimal1"`,
+`value_suffix:"%"`. (This is the shipped girls' config — flip `sex` for boys.)
 
 Then:
 
 ```bash
-python run.py --refetch        # pulls the new indicator + flags
-python run.py --extract-movers # candidate spotlight events for hand-curation
-python run.py                  # render
+python run.py --refetch            # pull source + assets
+python run.py --preview-frames auto # eyeball layout across the timeframe
+python run.py --generate-variants && python run.py --auto-assemble
+python run.py --generate-narration  # TTS + render + mux (narrated mp4)
 ```
 
-## Previewing before committing to a full render
+**Music budget:** the narrated video must be **≤ 47.0s** (the music track
+length) — never longer, or the music loops. The timing-fit quantizes
+`steps_per_year` to an integer, so body length snaps to discrete values; if the
+total overruns, lower `render.narration.max_speech_coverage` to shorten the
+voice until the body lands under budget. Do **not** speed up audio.
+
+## Previewing before a full render
 
 ```bash
 python run.py --preview-frame 1995
-python run.py --preview-frame 2010
-python run.py --preview-frame 2023
+python run.py --preview-frames auto   # 5 frames across the timeframe
 ```
 
-Three frames spanning the timeframe will tell you if the race has visible motion at all phases. If two of the three look identical, the dataset is too flat — pick another.
+If two frames look identical, the race is too flat — pick another dataset.

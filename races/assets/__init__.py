@@ -1,8 +1,10 @@
 from .base import AssetProvider
 from .flags import FlagProvider
+from .letter import LetterAvatarProvider
 
 REGISTRY = {
     'flags': FlagProvider,
+    'letter': LetterAvatarProvider,
 }
 
 

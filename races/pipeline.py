@@ -10,6 +10,7 @@ from .sources.world_bank import WorldBankSource
 from .assets import build_provider
 from .assets.fonts import ensure_orbitron
 from .render import render, get_theme
+from .render.layout import auto_size_columns
 
 
 def _archive_narration(cache_dir: Path) -> None:
@@ -150,6 +151,15 @@ def run(config_path: Path, *, refetch: bool = False,
         print(f"[accumulated] applied — title='{title}', output='{output_name}', "
               f"trend_label='{render_cfg.get('trend_label', '')}'.")
 
+    # ── Optional world-trend mode override ──────────────────────────────────
+    # Default trend = Σ across countries (set inside renderer). For datasets
+    # where summing is meaningless (e.g. heights), config can request the
+    # simple cross-country mean per year.
+    world_trend_mode = (cfg.get('render') or {}).get('world_trend_mode')
+    if world_trend_mode == 'average' and '_world_trend_yearly' not in render_cfg:
+        render_cfg['_world_trend_yearly'] = result.data.mean(axis=1)
+        print("[world-trend] using cross-country mean per year.")
+
     # ── Optional unit scaling (e.g. Mt → t = 1e6) ────────────────────────────
     value_scale = cfg.get('value_scale')
     if value_scale and float(value_scale) != 1.0:
@@ -170,9 +180,12 @@ def run(config_path: Path, *, refetch: bool = False,
     provider.ensure(all_names, result.icon_ids)
 
     # Warn about any country that appears in the data but has no flag on disk.
+    # Only meaningful for the flag provider; other providers (e.g. letter
+    # avatars) don't use cache/flags.
     from .util import safe_filename
     missing = [c for c in result.data.columns
-               if result.data[c].notna().any()
+               if asset_cfg.get('type', 'flags') == 'flags'
+               and result.data[c].notna().any()
                and not (cache_dir / 'flags' / (safe_filename(c) + '.png')).exists()]
     if missing:
         print(f"[flags] WARNING: {len(missing)} country/countries in the dataset have no flag:")
@@ -255,7 +268,8 @@ def run(config_path: Path, *, refetch: bool = False,
         n_on_screen = int(render_cfg.get('top_n_on_screen', 10))
 
         scores_df, ranks_df = interpolate_and_rank(
-            result.data, steps_per_year, smooth_a, smooth_b)
+            result.data, steps_per_year, smooth_a, smooth_b,
+            invert=bool(render_cfg.get('invert_ranking', False)))
 
         stat_pack = build_stat_pack(
             scores_df, ranks_df,
@@ -263,6 +277,7 @@ def run(config_path: Path, *, refetch: bool = False,
             value_format=value_format,
             video_title=title,
             n_on_screen=n_on_screen,
+            invert_ranking=bool(render_cfg.get('invert_ranking', False)),
         )
         spotlight_cfg = render_cfg.get('spotlight', {}) or {}
         curated_rel = spotlight_cfg.get('curated_file')
@@ -387,6 +402,11 @@ def run(config_path: Path, *, refetch: bool = False,
 
     is_single_frame = preview_frame_year is not None or resolved_preview_years is not None
 
+    # ── Auto-size name box to fit longest country in ever-top-N ─────────────
+    columns, name_max_chars = auto_size_columns(
+        result.data, int(render_cfg.get('top_n_on_screen', 10)))
+    render_cfg['name_max_chars'] = name_max_chars
+
     # ── Render ───────────────────────────────────────────────────────────────
     render(
         data=result.data,
@@ -397,6 +417,7 @@ def run(config_path: Path, *, refetch: bool = False,
         theme=theme,
         output_path=output_dir / output_name,
         render_cfg=render_cfg,
+        columns=columns,
         preview_timeframe=preview if not is_single_frame else None,
         single_frame_year=preview_frame_year,
         single_frame_png_path=(cache_dir / 'preview_frame.png'

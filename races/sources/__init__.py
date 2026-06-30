@@ -1,8 +1,12 @@
 from .base import DataSource, SourceResult
 from .world_bank import WorldBankSource
+from .csv_source import CsvSource
+from .ssa_names import SsaNamesSource
 
 REGISTRY = {
     'world_bank': WorldBankSource,
+    'csv': CsvSource,
+    'ssa_names': SsaNamesSource,
 }
 
 

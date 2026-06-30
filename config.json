@@ -1,36 +1,59 @@
 {
-  "video_title": "COVID Erased Tourism Overnight",
-  "value_format": "number",
+  "video_title": "America's #1 Baby Boy Name (1880-2024)",
+  "youtube": {
+    "title": "The Most Popular Baby Boy Name in America Every Year (1880-2024)",
+    "tags": [
+      "shorts",
+      "baby names",
+      "baby boy names",
+      "most popular baby names",
+      "baby name rankings",
+      "us baby names",
+      "popular names",
+      "name popularity",
+      "names by year",
+      "social security names",
+      "bar chart race",
+      "data visualization"
+    ]
+  },
+  "value_format": "decimal1",
+  "value_suffix": "%",
+  "value_scale": 100,
   "per_capita": false,
   "accumulated": false,
-  "output_filename": "tourism_arrivals_race.mp4",
+  "output_filename": "baby_names_boys_race.mp4",
   "theme": "glass_dark",
   "preview_timeframe": null,
   "source": {
-    "type": "world_bank",
-    "indicator": "ST.INT.ARVL",
+    "type": "ssa_names",
+    "sex": "M",
     "timeframe": [
-      1995,
-      2023
-    ]
+      1880,
+      2024
+    ],
+    "top_keep": 15,
+    "source_credit": "Source: US Social Security Administration"
   },
   "assets": {
-    "type": "flags"
+    "type": "letter"
   },
   "render": {
     "top_n_on_screen": 10,
-    "steps_per_year": 21,
+    "steps_per_year": 9,
     "fps": 30,
     "bitrate": 8000,
     "rank_smooth_window_a": 25,
     "rank_smooth_window_b": 35,
     "race_top": 0.72,
     "race_bottom": 0.11,
-    "show_total_trend": true,
-    "trend_label": "International tourist arrivals (per year)",
+    "show_total_trend": false,
+    "world_trend_mode": null,
+    "trend_label": null,
+    "value_suffix": "%",
     "trend_label_per_capita": null,
     "trend_label_accumulated": null,
-    "end_hold_seconds": 1.5,
+    "end_hold_seconds": 0.4,
     "flag_corner_radius_frac": 0.14,
     "row_min_weight": 0.35,
     "font_scale": 1.0,
@@ -55,7 +78,7 @@
     "background_animation": {
       "drift_period_seconds": null
     },
-"spotlight": {
+    "spotlight": {
       "enabled": false,
       "label": "BIG MOVER",
       "rate_window_years": 3,
@@ -82,7 +105,7 @@
       },
       "tone": "hype friend watching a race with you, casual and loud, uses slang, no suit-and-tie words",
       "words_per_second": 3.0,
-      "max_speech_coverage": 1.15,
+      "max_speech_coverage": 0.68,
       "tail_buffer_seconds": 1.5,
       "background_music": {
         "path": "races/assets/music/Bar_Chart_Race_Tension_2026-04-20T113611.mp3",

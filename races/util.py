@@ -15,6 +15,9 @@ def format_value(v: float, fmt: str, suffix: str = '') -> str:
     # Plain integer counts (goals, wins, etc.) — never abbreviated.
     if fmt in ('count', 'integer', 'goals'):
         return f'{int(round(v)):,}{tail}'
+    # One-decimal numbers (e.g. life expectancy in years) — never abbreviated.
+    if fmt in ('decimal1', 'decimal'):
+        return f'{v:,.1f}{tail}'
     prefix = '$' if fmt == 'currency' else ''
     # Aim for ~3 significant digits: when the leading number is single-digit,
     # show 2 decimals (e.g. $2.30 T); otherwise drop decimals (e.g. $12 T).

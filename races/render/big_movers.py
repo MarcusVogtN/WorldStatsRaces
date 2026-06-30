@@ -32,12 +32,14 @@ from ..util import display_name, format_value
 # ── Shared signal pipeline ────────────────────────────────────────────────
 
 def interpolate_and_rank(df: pd.DataFrame, steps_per_year: int,
-                         smooth_win_a: int, smooth_win_b: int):
+                         smooth_win_a: int, smooth_win_b: int,
+                         invert: bool = False):
     """Interpolate yearly values to sub-frames and compute smoothed ranks.
 
     Returns (scores, ranks). `scores` are the per-sub-frame values; `ranks`
-    are fractional (rolling-mean-smoothed) ranks ascending so that larger
-    values → larger rank numbers.
+    are fractional (rolling-mean-smoothed) ranks. By default larger values →
+    larger rank numbers (top of display). With `invert=True` the convention
+    flips so smaller values reach the top — used by 'lowest wins' races.
     """
     new_index = np.linspace(df.index.min(), df.index.max(),
                             (len(df) - 1) * steps_per_year + 1)
@@ -47,7 +49,10 @@ def interpolate_and_rank(df: pd.DataFrame, steps_per_year: int,
     # players with sparse career windows) get the lowest ranks instead of
     # NaN ranks. WB data has values for every country every year so this is
     # a no-op for the legacy path; sport datasets need it to render at all.
-    ranks = smoothed.fillna(0).rank(axis=1, method='first', ascending=True).astype(float)
+    fill_value = smoothed.max().max() if invert else 0
+    ranks = (smoothed.fillna(fill_value)
+             .rank(axis=1, method='first', ascending=(not invert))
+             .astype(float))
     ranks = ranks.rolling(window=smooth_win_b, center=True, min_periods=1).mean()
     return scores, ranks
 

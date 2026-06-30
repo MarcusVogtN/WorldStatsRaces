@@ -144,6 +144,12 @@ def main():
         from sportstatsraces.pipeline import run
         run(cfg_path,
             validate_layout=args.validate_layout,
+            generate_script=args.generate_script,
+            generate_narration=args.generate_narration,
+            mux_narration=args.mux_narration,
+            generate_variants=args.generate_variants,
+            regenerate_section=args.regenerate_section,
+            auto_assemble=args.auto_assemble,
             preview_frame_year=args.preview_frame,
             preview_frame_years=preview_frames)
 
