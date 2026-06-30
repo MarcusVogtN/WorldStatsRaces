@@ -1,10 +1,12 @@
 from .base import AssetProvider
 from .flags import FlagProvider
 from .letter import LetterAvatarProvider
+from .image import ArtistImageProvider
 
 REGISTRY = {
     'flags': FlagProvider,
     'letter': LetterAvatarProvider,
+    'image': ArtistImageProvider,
 }
 
 

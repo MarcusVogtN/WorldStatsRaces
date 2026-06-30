@@ -38,7 +38,7 @@
     "source_credit": "Source: Billboard Hot 100"
   },
   "assets": {
-    "type": "letter"
+    "type": "image"
   },
   "render": {
     "top_n_on_screen": 10,
