@@ -1,5 +1,6 @@
 """Main rendering loop. Flag-racing layout for YouTube Shorts safe zones."""
 
+import bisect
 import sys
 from pathlib import Path
 from typing import Optional
@@ -481,7 +482,8 @@ def render(data: pd.DataFrame,
     row_rate_window_years = float(render_cfg.get('row_rate_window_years', 1.0))
     row_rate_label = str(render_cfg.get('row_rate_label', '/SZN'))
     row_retired_label = str(render_cfg.get('row_retired_label', 'RETIRED'))
-    now_playing_by_year = render_cfg.get('now_playing_by_year') or None
+    now_playing_timeline = render_cfg.get('now_playing_timeline') or None
+    _np_fracs = [e[0] for e in now_playing_timeline] if now_playing_timeline else None
     # How many seasons of zero growth before flagging retirement. Guards
     # against marking still-active entities whose interpolated current season
     # happens to be flat at the very end of the dataset.
@@ -746,8 +748,12 @@ def render(data: pd.DataFrame,
 
         trend_pos = (frame_idx / max(1, n_frames_total - 1)) if show_total_trend else None
         current_total = float(trend_series[frame_idx]) if trend_series is not None else None
-        now_playing = (now_playing_by_year.get(str(year_int))
-                       if now_playing_by_year else None)
+        now_playing = None
+        if now_playing_timeline:
+            _i = bisect.bisect_right(_np_fracs,
+                                     float(scores_df.index[frame_idx])) - 1
+            if _i >= 0:
+                now_playing = now_playing_timeline[_i][1]
         _draw_title_year_trend(ax, theme, title, year_int, t_ease,
                                 trend_series=trend_series,
                                 trend_pos=trend_pos,

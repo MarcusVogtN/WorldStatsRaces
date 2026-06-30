@@ -67,6 +67,13 @@ def run(config_path: Path, *, refetch: bool = False,
     source_cfg = cfg['source']
     asset_cfg = cfg.get('assets', {'type': 'flags'})
     render_cfg = dict(cfg.get('render', {}))
+    # Optional "now at #1" song timeline (world-stats only): a JSON list of
+    # [fractional_year, "caption"] loaded from a sidecar file. Absent = no-op.
+    _np_file = render_cfg.pop('now_playing_timeline_file', None)
+    if _np_file:
+        import json as _json
+        render_cfg['now_playing_timeline'] = _json.loads(
+            Path(_np_file).read_text(encoding='utf-8'))
     theme = get_theme(cfg.get('theme', 'glass_dark'))
     value_format = cfg.get('value_format', 'currency')
     if 'value_suffix' in cfg:
