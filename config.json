@@ -1,46 +1,48 @@
 {
-  "video_title": "America's #1 Baby Boy Name (1880-2024)",
+  "video_title": "Most Weeks at #1 Since 2000",
   "youtube": {
-    "title": "The Most Popular Baby Boy Name in America Every Year (1880-2024)",
+    "title": "Who Spent the Most Weeks at #1? Billboard Hot 100 (2000-2026)",
     "tags": [
       "shorts",
-      "baby names",
-      "baby boy names",
-      "most popular baby names",
-      "baby name rankings",
-      "us baby names",
-      "popular names",
-      "name popularity",
-      "names by year",
-      "social security names",
+      "billboard",
+      "billboard hot 100",
+      "number one songs",
+      "biggest artists",
+      "taylor swift",
+      "drake",
+      "rihanna",
+      "music charts",
+      "weeks at number one",
       "bar chart race",
       "data visualization"
     ]
   },
-  "value_format": "decimal1",
-  "value_suffix": "%",
-  "value_scale": 100,
+  "value_format": "count",
+  "value_suffix": "wks",
+  "value_scale": 1,
   "per_capita": false,
   "accumulated": false,
-  "output_filename": "baby_names_boys_race.mp4",
+  "output_filename": "billboard_no1_artists_race.mp4",
   "theme": "glass_dark",
   "preview_timeframe": null,
   "source": {
-    "type": "ssa_names",
-    "sex": "M",
+    "type": "csv",
+    "path": "billboard_no1_artists.csv",
+    "country_col": "Artist",
+    "year_col": "Year",
+    "value_col": "CumWeeksAtNo1",
     "timeframe": [
-      1880,
-      2024
+      2000,
+      2026
     ],
-    "top_keep": 15,
-    "source_credit": "Source: US Social Security Administration"
+    "source_credit": "Source: Billboard Hot 100"
   },
   "assets": {
     "type": "letter"
   },
   "render": {
     "top_n_on_screen": 10,
-    "steps_per_year": 9,
+    "steps_per_year": 44,
     "fps": 30,
     "bitrate": 8000,
     "rank_smooth_window_a": 25,
@@ -50,7 +52,7 @@
     "show_total_trend": false,
     "world_trend_mode": null,
     "trend_label": null,
-    "value_suffix": "%",
+    "value_suffix": "wks",
     "trend_label_per_capita": null,
     "trend_label_accumulated": null,
     "end_hold_seconds": 0.4,
