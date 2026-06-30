@@ -116,6 +116,35 @@
         "fade_in_seconds": 0.5,
         "fade_out_seconds": 1.5
       }
+    },
+    "now_playing_by_year": {
+      "2000": "\"Maria Maria\" - Santana",
+      "2001": "\"All For You\" - Janet",
+      "2002": "\"Foolish\" - Ashanti",
+      "2003": "\"In Da Club\" - 50 Cent",
+      "2004": "\"Yeah!\" - Usher",
+      "2005": "\"We Belong Together\" - Mariah Carey",
+      "2006": "\"SexyBack\" - Justin Timberlake",
+      "2007": "\"Irreplaceable\" - Beyonce",
+      "2008": "\"Low\" - Flo Rida",
+      "2009": "\"I Gotta Feeling\" - The Black Eyed Peas",
+      "2010": "\"TiK ToK\" - Ke$ha",
+      "2011": "\"We Found Love\" - Rihanna",
+      "2012": "\"Call Me Maybe\" - Carly Rae Jepsen",
+      "2013": "\"Blurred Lines\" - Robin Thicke",
+      "2014": "\"Happy\" - Pharrell Williams",
+      "2015": "\"Uptown Funk!\" - Mark Ronson",
+      "2016": "\"Closer\" - The Chainsmokers",
+      "2017": "\"Despacito\" - Luis Fonsi",
+      "2018": "\"God's Plan\" - Drake",
+      "2019": "\"Old Town Road\" - Lil Nas X",
+      "2020": "\"The Box\" - Roddy Ricch",
+      "2021": "\"Butter\" - BTS",
+      "2022": "\"As It Was\" - Harry Styles",
+      "2023": "\"Last Night\" - Morgan Wallen",
+      "2024": "\"A Bar Song (Tipsy)\" - Shaboozey",
+      "2025": "\"Luther\" - Kendrick Lamar",
+      "2026": "\"Choosin' Texas\" - Ella Langley"
     }
   }
 }

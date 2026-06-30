@@ -152,8 +152,14 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                             title_scale_fs: float = 1.0,
                             title_weight='bold',
                             header_scale_fs: float = 1.0,
-                            header_weight='black'):
-    """Title card + (label-card | year-card) row + wide borderless trend line."""
+                            header_weight='black',
+                            now_playing: Optional[str] = None):
+    """Title card + (label-card | year-card) row + wide borderless trend line.
+
+    `now_playing`, when set, draws a small "song at #1 right now" caption in the
+    gap under the centered year card (no-trend layout only). Default None keeps
+    the existing layout untouched.
+    """
     if ' (' in title:
         main = title.split(' (', 1)[0]
     else:
@@ -197,6 +203,18 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                 color=theme.text_primary,
                 fontsize=52 * header_scale_fs, fontweight=header_weight,
                 alpha=alpha, fontfamily=theme.font_family, zorder=3)
+        if now_playing:
+            ax.text(0.5, 0.792, 'NOW AT #1',
+                    transform=ax.transAxes, ha='center', va='center',
+                    color=theme.text_secondary,
+                    fontsize=15 * header_scale_fs, fontweight=header_weight,
+                    alpha=0.85 * alpha, fontfamily=theme.font_family, zorder=3)
+            song_fs = 28 if len(now_playing) <= 30 else 23
+            ax.text(0.5, 0.760, now_playing,
+                    transform=ax.transAxes, ha='center', va='center',
+                    color=theme.text_primary,
+                    fontsize=song_fs * header_scale_fs, fontweight=header_weight,
+                    alpha=alpha, fontfamily=theme.font_family, zorder=3)
         return
 
     header_y = 0.850
@@ -463,6 +481,7 @@ def render(data: pd.DataFrame,
     row_rate_window_years = float(render_cfg.get('row_rate_window_years', 1.0))
     row_rate_label = str(render_cfg.get('row_rate_label', '/SZN'))
     row_retired_label = str(render_cfg.get('row_retired_label', 'RETIRED'))
+    now_playing_by_year = render_cfg.get('now_playing_by_year') or None
     # How many seasons of zero growth before flagging retirement. Guards
     # against marking still-active entities whose interpolated current season
     # happens to be flat at the very end of the dataset.
@@ -727,6 +746,8 @@ def render(data: pd.DataFrame,
 
         trend_pos = (frame_idx / max(1, n_frames_total - 1)) if show_total_trend else None
         current_total = float(trend_series[frame_idx]) if trend_series is not None else None
+        now_playing = (now_playing_by_year.get(str(year_int))
+                       if now_playing_by_year else None)
         _draw_title_year_trend(ax, theme, title, year_int, t_ease,
                                 trend_series=trend_series,
                                 trend_pos=trend_pos,
@@ -741,7 +762,8 @@ def render(data: pd.DataFrame,
                                 title_scale_fs=title_scale_fs,
                                 title_weight=title_weight,
                                 header_scale_fs=header_scale_fs,
-                                header_weight=header_weight)
+                                header_weight=header_weight,
+                                now_playing=now_playing)
 
         ax.text(0.04, SAFE_BOTTOM - 0.02, source_credit.upper(),
                 transform=ax.transAxes, ha='left', va='bottom',
