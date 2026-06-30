@@ -42,7 +42,7 @@
   },
   "render": {
     "top_n_on_screen": 10,
-    "steps_per_year": 44,
+    "steps_per_year": 56,
     "fps": 30,
     "bitrate": 8000,
     "rank_smooth_window_a": 25,
@@ -107,7 +107,7 @@
       },
       "tone": "hype friend watching a race with you, casual and loud, uses slang, no suit-and-tie words",
       "words_per_second": 3.0,
-      "max_speech_coverage": 0.68,
+      "max_speech_coverage": 0.88,
       "tail_buffer_seconds": 1.5,
       "background_music": {
         "path": "races/assets/music/Bar_Chart_Race_Tension_2026-04-20T113611.mp3",
