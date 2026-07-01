@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from matplotlib.patches import FancyBboxPatch
+from matplotlib.patches import FancyBboxPatch, Rectangle
 import imageio.plugins.ffmpeg as _ffmpeg_plugin
 
 from ..util import format_value, display_name
@@ -85,6 +85,41 @@ def _draw_background(ax, theme: Theme, *, frame_idx: int = 0, fps: int = 30,
                   origin='upper', interpolation='bilinear')
     else:
         ax.set_facecolor(bg)
+
+
+def _draw_music_visualizer(ax, theme: Theme, *, frame_idx: int, fps: int,
+                           cfg: dict | None):
+    """Procedural equalizer backdrop behind the race — a row of bars whose
+    heights bounce with a pseudo-beat, so a music video reads as musical.
+    Gated: absent/disabled cfg draws nothing (other channels unaffected)."""
+    if not cfg or not cfg.get('enabled'):
+        return
+    import math
+    n = int(cfg.get('bars', 48))
+    max_h = float(cfg.get('max_height', 0.5))
+    base_alpha = float(cfg.get('alpha', 0.10))
+    speed = float(cfg.get('speed', 1.0))
+    bpm = float(cfg.get('bpm', 120.0))
+    palette = list(theme.accent_palette) or ['#ffffff']
+    t = (frame_idx / max(1, fps)) * speed
+    # Global beat: a pulse that scales every bar together, ~bpm.
+    beat = 0.6 + 0.4 * abs(math.sin(math.pi * (t * bpm / 60.0)))
+    gap_frac = 0.30
+    bar_w = 1.0 / n
+    for i in range(n):
+        p = i / max(1, n - 1)
+        # Two layered sines with per-bar phase → uncorrelated bouncing.
+        a = math.sin(2 * math.pi * (0.7 * t + p * 3.1)) * 0.5 + 0.5
+        b = math.sin(2 * math.pi * (1.3 * t + p * 5.7 + 0.4)) * 0.5 + 0.5
+        amp = 0.6 * a + 0.4 * b
+        # Center-weighted envelope so it looks like a spectrum (bass mid).
+        env = 1.0 - 0.5 * abs(p - 0.5) * 2
+        h = max_h * (0.12 + 0.88 * amp) * env * beat
+        rect = Rectangle((i * bar_w + bar_w * gap_frac / 2, 0.0),
+                         bar_w * (1 - gap_frac), h,
+                         facecolor=palette[i % len(palette)], edgecolor='none',
+                         alpha=base_alpha, zorder=-5)
+        ax.add_patch(rect)
 
 
 def _hex_to_rgb(hx: str) -> tuple:
@@ -547,6 +582,7 @@ def render(data: pd.DataFrame,
     drift_period_seconds = bg_anim_cfg.get('drift_period_seconds')
     drift_period_frames = (int(float(drift_period_seconds) * fps)
                            if drift_period_seconds else None)
+    music_visualizer_cfg = render_cfg.get('music_visualizer') or None
     _bg_cache: dict = {}
 
     total_countries = len(data.columns)
@@ -704,6 +740,8 @@ def render(data: pd.DataFrame,
         _draw_background(ax, theme, frame_idx=frame_idx, fps=fps,
                          n_frames_total=n_frames_total,
                          drift_period_frames=drift_period_frames)
+        _draw_music_visualizer(ax, theme, frame_idx=frame_idx, fps=fps,
+                               cfg=music_visualizer_cfg)
 
         scores = scores_df.iloc[frame_idx]
         ranks = ranks_df.iloc[frame_idx]

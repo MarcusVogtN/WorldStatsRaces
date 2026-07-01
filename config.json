@@ -80,6 +80,14 @@
     "background_animation": {
       "drift_period_seconds": null
     },
+    "music_visualizer": {
+      "enabled": true,
+      "bars": 56,
+      "max_height": 0.17,
+      "alpha": 0.16,
+      "speed": 1.0,
+      "bpm": 120
+    },
     "spotlight": {
       "enabled": false,
       "label": "BIG MOVER",
