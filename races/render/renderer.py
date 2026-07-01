@@ -251,13 +251,13 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                 fontsize=52 * header_scale_fs, fontweight=header_weight,
                 alpha=alpha, fontfamily=theme.font_family, zorder=3)
         if now_playing:
-            ax.text(0.5, 0.792, 'NOW AT #1',
+            ax.text(0.5, 0.790, 'NOW AT #1',
                     transform=ax.transAxes, ha='center', va='center',
                     color=theme.text_secondary,
-                    fontsize=15 * header_scale_fs, fontweight=header_weight,
+                    fontsize=20 * header_scale_fs, fontweight=header_weight,
                     alpha=0.85 * alpha, fontfamily=theme.font_family, zorder=3)
-            song_fs = 28 if len(now_playing) <= 30 else 23
-            ax.text(0.5, 0.760, now_playing,
+            song_fs = 35 if len(now_playing) <= 30 else 28
+            ax.text(0.5, 0.755, now_playing,
                     transform=ax.transAxes, ha='center', va='center',
                     color=theme.text_primary,
                     fontsize=song_fs * header_scale_fs, fontweight=header_weight,

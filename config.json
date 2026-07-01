@@ -61,7 +61,7 @@
     "font_scale": 1.0,
     "fonts": {
       "title": {
-        "size_scale": 0.62,
+        "size_scale": 0.72,
         "weight": 600
       },
       "header": {
