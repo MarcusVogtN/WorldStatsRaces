@@ -100,7 +100,10 @@ def _draw_music_visualizer(ax, theme: Theme, *, frame_idx: int, fps: int,
     base_alpha = float(cfg.get('alpha', 0.10))
     speed = float(cfg.get('speed', 1.0))
     bpm = float(cfg.get('bpm', 120.0))
-    palette = list(theme.accent_palette) or ['#ffffff']
+    mirror_top = bool(cfg.get('mirror_top', False))
+    top_scale = float(cfg.get('top_scale', 0.6))
+    # Explicit colours (music-vibe neon) override the muted artist palette.
+    palette = list(cfg.get('colors') or theme.accent_palette) or ['#ffffff']
     t = (frame_idx / max(1, fps)) * speed
     # Global beat: a pulse that scales every bar together, ~bpm.
     beat = 0.6 + 0.4 * abs(math.sin(math.pi * (t * bpm / 60.0)))
@@ -115,11 +118,19 @@ def _draw_music_visualizer(ax, theme: Theme, *, frame_idx: int, fps: int,
         # Center-weighted envelope so it looks like a spectrum (bass mid).
         env = 1.0 - 0.5 * abs(p - 0.5) * 2
         h = max_h * (0.12 + 0.88 * amp) * env * beat
-        rect = Rectangle((i * bar_w + bar_w * gap_frac / 2, 0.0),
-                         bar_w * (1 - gap_frac), h,
-                         facecolor=palette[i % len(palette)], edgecolor='none',
-                         alpha=base_alpha, zorder=-5)
-        ax.add_patch(rect)
+        x = i * bar_w + bar_w * gap_frac / 2
+        w = bar_w * (1 - gap_frac)
+        color = palette[i % len(palette)]
+        ax.add_patch(Rectangle((x, 0.0), w, h, facecolor=color,
+                               edgecolor='none', alpha=base_alpha, zorder=-5))
+        if mirror_top:
+            # A second, phase-shifted row hanging from the top edge so the
+            # visualizer frames the whole screen.
+            a2 = math.sin(2 * math.pi * (0.9 * t + p * 4.3 + 1.7)) * 0.5 + 0.5
+            h2 = max_h * top_scale * (0.12 + 0.88 * a2) * env * beat
+            ax.add_patch(Rectangle((x, 1.0 - h2), w, h2, facecolor=color,
+                                   edgecolor='none', alpha=base_alpha,
+                                   zorder=-5))
 
 
 def _hex_to_rgb(hx: str) -> tuple:
