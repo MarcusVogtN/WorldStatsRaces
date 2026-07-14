@@ -44,6 +44,13 @@ class PlayersCsvSource(DataSource):
         pivot.columns.name = None
         pivot = pivot.sort_index()
 
+        # Optional inclusive period window (e.g. cap ages at 15..18). Absent =
+        # use the full range in the CSV.
+        timeframe = self.cfg.get('timeframe')
+        if timeframe:
+            y0, y1 = int(timeframe[0]), int(timeframe[1])
+            pivot = pivot.loc[(pivot.index >= y0) & (pivot.index <= y1)]
+
         icon_ids = dict(self.cfg.get('icon_ids') or {})
         credit = self.cfg.get('source_credit', 'Source: CSV')
         print(f"players_csv: {len(pivot.columns)} entities × {len(pivot)} periods.")
