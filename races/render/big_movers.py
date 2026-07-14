@@ -33,16 +33,24 @@ from ..util import display_name, format_value
 
 def interpolate_and_rank(df: pd.DataFrame, steps_per_year: int,
                          smooth_win_a: int, smooth_win_b: int,
-                         invert: bool = False):
+                         invert: bool = False,
+                         new_index=None):
     """Interpolate yearly values to sub-frames and compute smoothed ranks.
 
     Returns (scores, ranks). `scores` are the per-sub-frame values; `ranks`
     are fractional (rolling-mean-smoothed) ranks. By default larger values →
     larger rank numbers (top of display). With `invert=True` the convention
     flips so smaller values reach the top — used by 'lowest wins' races.
+
+    `new_index` (optional) overrides the uniform sub-frame grid with a
+    caller-supplied one — used by adaptive pacing to spend more frames on
+    turbulent periods and fewer on frozen ones. It must include every
+    original index value as an anchor so interpolation has endpoints to
+    fill between.
     """
-    new_index = np.linspace(df.index.min(), df.index.max(),
-                            (len(df) - 1) * steps_per_year + 1)
+    if new_index is None:
+        new_index = np.linspace(df.index.min(), df.index.max(),
+                                (len(df) - 1) * steps_per_year + 1)
     scores = df.reindex(new_index).interpolate(method='linear')
     smoothed = scores.rolling(window=smooth_win_a, center=True, min_periods=1).mean()
     # Fill NaN with 0 before ranking so pre-debut entities (e.g. football

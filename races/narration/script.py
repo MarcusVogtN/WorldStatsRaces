@@ -604,9 +604,9 @@ def generate_variants(*, stat_pack: dict, timeline: dict,
     )
 
     doc = {
-        "hooks": _pad_or_trim([s.strip() for s in emitted.get("hooks", [])], SECTION_COUNTS["hook"]),
-        "middles": _pad_or_trim([s.strip() for s in emitted.get("middles", [])], SECTION_COUNTS["middle"]),
-        "endings": _pad_or_trim([s.strip() for s in emitted.get("endings", [])], SECTION_COUNTS["ending"]),
+        "hooks": _pad_or_trim([_option_text(s).strip() for s in emitted.get("hooks", [])], SECTION_COUNTS["hook"]),
+        "middles": _pad_or_trim([_option_text(s).strip() for s in emitted.get("middles", [])], SECTION_COUNTS["middle"]),
+        "endings": _pad_or_trim([_option_text(s).strip() for s in emitted.get("endings", [])], SECTION_COUNTS["ending"]),
         "meta": {
             "generated_at": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
             "model": model,
@@ -624,6 +624,21 @@ def generate_variants(*, stat_pack: dict, timeline: dict,
         json.dump(doc, f, ensure_ascii=False, indent=2)
     print(f"→ wrote {out_path}")
     return doc
+
+
+def _option_text(o) -> str:
+    """The LLM occasionally emits {'text': ...} objects instead of plain
+    strings in the section arrays; coerce either shape to the option text."""
+    if isinstance(o, dict):
+        for k in ("text", "option", "value", "content", "line"):
+            v = o.get(k)
+            if isinstance(v, str):
+                return v
+        vals = [v for v in o.values() if isinstance(v, str)]
+        if vals:
+            return " ".join(vals)
+        return json.dumps(o, ensure_ascii=False)
+    return str(o)
 
 
 def regenerate_section(*, section: str, stat_pack: dict, timeline: dict,
@@ -658,7 +673,7 @@ def regenerate_section(*, section: str, stat_pack: dict, timeline: dict,
 
     plural = {"hook": "hooks", "middle": "middles", "ending": "endings"}[section]
     new_options = _pad_or_trim(
-        [s.strip() for s in emitted.get(plural, [])],
+        [_option_text(s).strip() for s in emitted.get(plural, [])],
         SECTION_COUNTS[section],
     )
     doc[plural] = new_options

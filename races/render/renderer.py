@@ -1,6 +1,7 @@
 """Main rendering loop. Flag-racing layout for YouTube Shorts safe zones."""
 
 import sys
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -33,6 +34,29 @@ AX_MARGIN = 0.02
 
 SAFE_RIGHT = 0.86
 SAFE_BOTTOM = 0.08   # just enough clearance for the source-credit line
+
+
+def _prepare_bg_video_frames(video_path, n_frames, fps, work_dir):
+    """Extract n_frames frames at `fps` from a background video, looping the
+    source if it's shorter, cropped/scaled to fill the 1080x1920 frame. Returns
+    the sorted list of extracted PNG paths. Used as a per-frame full-bleed
+    backdrop the chart composites over (see render's update loop)."""
+    import shutil
+    work_dir = Path(work_dir)
+    shutil.rmtree(work_dir, ignore_errors=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    ffmpeg = _ffmpeg_plugin.get_exe()
+    w, h = int(FIG_W_PX), int(FIG_H_PX)
+    vf = (f"fps={fps},scale={w}:{h}:force_original_aspect_ratio=increase,"
+          f"crop={w}:{h}")
+    cmd = [ffmpeg, '-y', '-stream_loop', '-1', '-i', str(video_path),
+           '-vf', vf, '-frames:v', str(int(n_frames)),
+           str(work_dir / 'bg_%05d.png')]
+    subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
+    frames = sorted(work_dir.glob('bg_*.png'))
+    if not frames:
+        raise RuntimeError(f"bg-video extraction produced no frames: {video_path}")
+    return frames
 
 
 def _draw_background(ax, theme: Theme, *, frame_idx: int = 0, fps: int = 30,
@@ -144,6 +168,7 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                             trend_label: str,
                             start_year: Optional[int] = None,
                             end_year: Optional[int] = None,
+                            trend_from_zero: bool = False,
                             t_title: float = 1.0,
                             t_draw: float = 1.0,
                             total_value: Optional[float] = None,
@@ -152,7 +177,14 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                             title_scale_fs: float = 1.0,
                             title_weight='bold',
                             header_scale_fs: float = 1.0,
-                            header_weight='black'):
+                            header_weight='black',
+                            header_template: str = '',
+                            header_timeline: bool = False,
+                            timeline_label: str = 'AGE {year}',
+                            timeline_endpoints: Optional[tuple] = None,
+                            timeline_pop: bool = True,
+                            header_y_offset: float = 0.0,
+                            year_frac: Optional[float] = None):
     """Title card + (label-card | year-card) row + wide borderless trend line."""
     if ' (' in title:
         main = title.split(' (', 1)[0]
@@ -171,6 +203,78 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
 
     title_cx = 0.5
     title_cy = 0.915
+
+    # Timeline header: static title on top, then a start→end age track with a
+    # sliding dot, yellow progress fill, and a big age number riding above the
+    # dot that pops on every integer tick. Gated — only used when a channel
+    # sets render.header_timeline. Needs year_frac + start/end for the dot.
+    if header_timeline and year_frac is not None and \
+            start_year is not None and end_year is not None and end_year > start_year:
+        accent = theme.text_primary
+        line = header_template or title
+        ax.text(title_cx, 0.955 - header_y_offset, line.upper(),
+                transform=ax.transAxes, ha='center', va='center',
+                color=theme.text_primary,
+                fontsize=26 * title_scale * title_scale_fs, fontweight=title_weight,
+                alpha=1.0, fontfamily=theme.font_family, zorder=3)
+
+        track_y = 0.878 - header_y_offset
+        track_x0, track_x1 = 0.17, 0.83
+        frac = float(np.clip((year_frac - start_year) / (end_year - start_year), 0.0, 1.0))
+        dot_x = track_x0 + frac * (track_x1 - track_x0)
+
+        # Track: dim full line + accent progress fill up to the dot.
+        ax.plot([track_x0, track_x1], [track_y, track_y],
+                transform=ax.transAxes, color=theme.text_secondary,
+                linewidth=3, alpha=0.25 * alpha, zorder=2,
+                solid_capstyle='round')
+        ax.plot([track_x0, dot_x], [track_y, track_y],
+                transform=ax.transAxes, color=accent,
+                linewidth=3, alpha=alpha, zorder=2, solid_capstyle='round')
+        ax.scatter([dot_x], [track_y], transform=ax.transAxes,
+                   s=140, color=accent, alpha=alpha, zorder=3,
+                   edgecolors='none')
+
+        # Endpoint age labels just outside the track.
+        _ep = timeline_endpoints or (int(start_year), int(end_year))
+        for x, ha, v in ((track_x0 - 0.025, 'right', _ep[0]),
+                         (track_x1 + 0.025, 'left', _ep[1])):
+            ax.text(x, track_y, str(v),
+                    transform=ax.transAxes, ha=ha, va='center',
+                    color=theme.text_secondary,
+                    fontsize=18 * header_scale_fs, fontweight=header_weight,
+                    alpha=0.8 * alpha, fontfamily=theme.font_family, zorder=3)
+
+        # Big age number above the dot; pops (scale bounce) right after each
+        # integer tick, driven by the fractional progress into the current age.
+        if timeline_pop:
+            age_prog = year_frac - np.floor(year_frac)
+            pop_t = float(np.clip(age_prog / 0.15, 0.0, 1.0))
+            pop_scale = 1.0 + 0.45 * (1.0 - smoothstep(pop_t))
+        else:
+            pop_scale = 1.0
+        num_x = float(np.clip(dot_x, 0.12, 0.88))
+        ax.text(num_x, track_y + 0.033,
+                timeline_label.replace('{year}', str(year_int)),
+                transform=ax.transAxes, ha='center', va='center',
+                color=accent,
+                fontsize=34 * pop_scale * title_scale * header_scale_fs,
+                fontweight=header_weight,
+                alpha=alpha, fontfamily=theme.font_family, zorder=3)
+        return
+
+    # Combined title+period header: one centered line (e.g. "GOALS AT 18 YEARS
+    # OLD") with the live period substituted in. Replaces both the standalone
+    # title and the year card, freeing vertical room for the race. Gated — only
+    # used when a channel sets render.header_template.
+    if header_template:
+        line = header_template.replace('{age}', str(year_int)).replace('{period}', str(year_int))
+        ax.text(title_cx, title_cy, line.upper(),
+                transform=ax.transAxes, ha='center', va='center',
+                color=theme.text_primary,
+                fontsize=36 * title_scale * title_scale_fs, fontweight=title_weight,
+                alpha=1.0, fontfamily=theme.font_family, zorder=3)
+        return
 
     ax.text(title_cx, title_cy, main.upper(),
             transform=ax.transAxes, ha='center', va='center',
@@ -239,6 +343,10 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
     ys = trend_series.astype(float)
     ymin = float(np.nanmin(ys)) if np.isfinite(np.nanmin(ys)) else 0.0
     ymax = float(np.nanmax(ys)) if np.isfinite(np.nanmax(ys)) else 1.0
+    # Anchor the curve to a 0 baseline so the record visibly climbs FROM zero
+    # rather than from whatever the first season's value happened to be.
+    if trend_from_zero:
+        ymin = 0.0
     if ymax <= ymin:
         ymax = ymin + 1.0
     n = len(ys)
@@ -263,6 +371,13 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
     if trend_pos is not None:
         tp = float(np.clip(trend_pos, 0.0, 1.0))
         idx = int(round(tp * (n - 1)))
+        # Traveled trail: overdraw the portion the year-marker has already
+        # swept in a brighter accent so the climb the record has made so far
+        # reads clearly against the dim full curve.
+        if trend_from_zero and idx >= 1 and idx < draw_end:
+            ax.plot(line_x[:idx + 1], line_y_pop[:idx + 1],
+                    color='#fbbf24',
+                    linewidth=2.6, alpha=0.95, zorder=4, solid_capstyle='round')
         dot_x = line_x[idx]
         dot_y = line_y_pop[idx]
         guide_top = plot_y0 + (plot_y1 - plot_y0) * trend_pop
@@ -288,6 +403,19 @@ def _draw_title_year_trend(ax, theme: Theme, title: str, year_int: int,
                 color=theme.text_primary, fontsize=year_fs, fontweight=header_weight,
                 alpha=1.0, fontfamily=theme.font_family, zorder=4)
 
+    # Zero-origin marker: a faint "0" at the value baseline on the left, so the
+    # climbing record is anchored to nothing — it grew from 0.
+    if trend_from_zero:
+        pop = 0.35 + (1.0 + c3 * (tt - 1) ** 3 + c1 * (tt - 1) ** 2) * 0.65
+        base_y = plot_y0 + (0.0) * trend_pop  # value 0 → plot_y0 after pop
+        ax.plot([plot_x0 - 0.006, plot_x0], [base_y, base_y],
+                transform=ax.transAxes, color=theme.text_secondary,
+                linewidth=1.0, alpha=0.5 * alpha, zorder=3)
+        ax.text(plot_x0 - 0.010, base_y, '0',
+                transform=ax.transAxes, ha='right', va='center',
+                color=theme.text_secondary,
+                fontsize=14 * header_scale_fs, fontweight=header_weight,
+                alpha=0.7 * alpha, fontfamily=theme.font_family, zorder=3)
     if start_year is not None:
         ax.text(plot_x0, plot_y0 - 0.012, str(start_year),
                 transform=ax.transAxes, ha='left', va='top',
@@ -456,6 +584,12 @@ def render(data: pd.DataFrame,
     trend_label = render_cfg.get('trend_label', 'Total — all countries')
     flag_corner_radius_frac = render_cfg.get('flag_corner_radius_frac', 0.14)
     value_suffix = str(render_cfg.get('value_suffix', '') or '')
+    # When set, the value label is always drawn to the RIGHT of the flag/
+    # headshot (never tucked to its left inside the bar). Default preserves
+    # the adaptive left/right placement.
+    value_always_right = bool(render_cfg.get('value_always_right', False))
+    show_zero_values = bool(render_cfg.get('show_zero_values', False))
+    intro_style = str(render_cfg.get('intro_style', '') or '')
     row_gap = render_cfg.get('row_gap', 0.008)
     name_max_chars = int(render_cfg.get('name_max_chars', 22))
     show_row_rate = bool(render_cfg.get('show_row_rate', False))
@@ -467,6 +601,10 @@ def render(data: pd.DataFrame,
     # against marking still-active entities whose interpolated current season
     # happens to be flat at the very end of the dataset.
     row_retired_dead_seasons = float(render_cfg.get('row_retired_dead_seasons', 1.5))
+    # Entities that must never be flagged "retired" even if their value stops
+    # growing — e.g. players still active but no longer adding to THIS
+    # competition (left the league / continent). Default empty.
+    retirement_exclude = set(render_cfg.get('retirement_exclude', []) or [])
 
     race_top = render_cfg.get('race_top', 0.72 if show_total_trend else 0.78)
     race_bottom = render_cfg.get('race_bottom', 0.11)
@@ -478,10 +616,72 @@ def render(data: pd.DataFrame,
     )
     race_height = vertical.race_height
 
+    # Ordinal periods: give every source period (e.g. each World Cup) equal
+    # screen time regardless of calendar gaps, and snap the displayed year to
+    # the period the bars are racing toward. Gated — default keeps the
+    # calendar-proportional behavior.
+    ordinal_periods = bool(render_cfg.get('ordinal_periods', False))
+    period_years = None
+    if ordinal_periods:
+        period_years = [int(round(float(y))) for y in data.index]
+        data = data.copy()
+        data.index = pd.Index(np.arange(len(period_years), dtype=float),
+                              name=data.index.name)
+
+    # Adaptive pacing: spend more frames on periods where the visible top-N
+    # churns and fewer on frozen stretches, so the viewer can actually react
+    # to changes. Gated + requires ordinal_periods (needs discrete periods).
+    # Frame counts scale with steps_per_year and average to it, so the
+    # narration timing-fit still controls total length. Default off.
+    adaptive_index = None
+    if bool(render_cfg.get('adaptive_pacing', False)) and ordinal_periods and len(data) > 2:
+        a_base = float(render_cfg.get('adaptive_base', 0.3))
+        a_gain = float(render_cfg.get('adaptive_gain', 0.5))
+        a_min = int(render_cfg.get('adaptive_min_frames', 3))
+        a_max = int(render_cfg.get('adaptive_max_frames', 3 * steps_per_year))
+        invert_r = bool(render_cfg.get('invert_ranking', False))
+        vals = data.fillna(0.0)
+        # Ordered top-N occupants per period (by value; ties broken by name for
+        # determinism), then count how many of the N slots change occupant
+        # going into each period — that's the per-transition turbulence.
+        def _order(row):
+            s = row[row > 0]
+            s = s.sort_values(ascending=invert_r, kind='mergesort')
+            top = list(s.index[-n_on_screen:][::-1]) if not invert_r else list(s.index[:n_on_screen])
+            return top
+        orders = [_order(vals.iloc[i]) for i in range(len(vals))]
+        turb = np.zeros(len(vals) - 1)
+        for i in range(len(vals) - 1):
+            a, b = orders[i], orders[i + 1]
+            m = max(len(a), len(b))
+            a = a + [None] * (m - len(a))
+            b = b + [None] * (m - len(b))
+            turb[i] = sum(1 for p in range(m) if a[p] != b[p])
+        # Anticipation lead-in: give ONLY the single segment immediately before
+        # a shake-up a decayed copy of that shake-up's turbulence, so the race
+        # eases off just as the change is about to start (one brace beat) — it
+        # does NOT propagate further back, so long frozen runs stay fast.
+        # a_anticipate in (0,1) scales the brace intensity; 0 = no lead-in.
+        a_anticipate = float(render_cfg.get('adaptive_anticipate', 0.0))
+        if a_anticipate > 0.0:
+            raw_turb = turb.copy()
+            for i in range(len(turb) - 1):
+                turb[i] = max(turb[i], a_anticipate * raw_turb[i + 1])
+        shape = a_base + a_gain * turb
+        shape = shape / max(shape.mean(), 1e-9)   # mean 1 → total ≈ uniform
+        seg_frames = np.clip(np.round(steps_per_year * shape).astype(int), a_min, a_max)
+        segs = [np.linspace(i, i + 1, seg_frames[i] + 1)[:-1] for i in range(len(vals) - 1)]
+        segs.append(np.array([float(len(vals) - 1)]))
+        adaptive_index = np.concatenate(segs)
+        print(f"[adaptive-pacing] {len(vals)-1} transitions, "
+              f"frames {seg_frames.min()}-{seg_frames.max()} (turb 0-{int(turb.max())}), "
+              f"total {len(adaptive_index)} vs uniform {(len(vals)-1)*steps_per_year+1}")
+
     print('Preparing frames...')
     scores_df, ranks_df = interpolate_and_rank(
         data, steps_per_year, smooth_a, smooth_b,
-        invert=bool(render_cfg.get('invert_ranking', False)))
+        invert=bool(render_cfg.get('invert_ranking', False)),
+        new_index=adaptive_index)
     invert_ranking = bool(render_cfg.get('invert_ranking', False))
     country_colors = assign_colors(data.columns, theme.accent_palette)
 
@@ -504,6 +704,9 @@ def render(data: pd.DataFrame,
         n_frames_total_pre = len(scores_df)
         min_dead_steps = max(1, int(round(row_retired_dead_seasons * steps_per_year)))
         for c in scores_df.columns:
+            if c in retirement_exclude:
+                retirement_frame[c] = 10**9
+                continue
             v = scores_df[c].fillna(0).to_numpy(dtype=float)
             if v.size < 2 or v.max() <= 0:
                 retirement_frame[c] = 10**9
@@ -550,6 +753,10 @@ def render(data: pd.DataFrame,
                   .bfill()
                   .to_numpy()
             )
+        elif render_cfg.get('trend_mode') == 'leader':
+            # Leader mode: trend follows the current #1's running value
+            # (e.g. the all-time record climbing), not the sum across entities.
+            trend_series = scores_df.fillna(0).max(axis=1).to_numpy()
         else:
             trend_series = scores_df.fillna(0).sum(axis=1).to_numpy()
     else:
@@ -670,23 +877,97 @@ def render(data: pd.DataFrame,
         'spotlight_prev_subtext': '',
     }
 
-    start_year = int(float(data.index.min()))
-    end_year = int(float(data.index.max()))
+    # Under ordinal_periods the index is a 0..N-1 arange, so use the real
+    # calendar years for the trend endpoint labels rather than the ordinals.
+    if ordinal_periods and period_years:
+        start_year = int(period_years[0])
+        end_year = int(period_years[-1])
+    else:
+        start_year = int(float(data.index.min()))
+        end_year = int(float(data.index.max()))
+    # Display-only shift for the trend's END-label number only. Does NOT touch
+    # the data index, the start label, the dot age, sublabels, or ordering —
+    # e.g. a race capped at the age-18 column can label its right edge "19" to
+    # read as "totals by their 19th birthday". Default 0 = show the real index.
+    end_period_offset = int(render_cfg.get('end_period_offset', 0))
+    end_year += end_period_offset
+    trend_from_zero = bool(render_cfg.get('trend_from_zero', False))
 
     n_frames_total = len(scores_df)
+
+    # Optional full-frame video background: extract (looping) frames to match
+    # the animation length, then paint each behind the chart per frame.
+    bg_frame_paths = None
+    bg_video = render_cfg.get('background_video')
+    _is_single = single_frame_year is not None or bool(single_frame_years)
+    if bg_video and not _is_single:
+        bgv = Path(bg_video)
+        if not bgv.is_absolute():
+            bgv = Path.cwd() / bgv
+        if not bgv.exists():
+            raise SystemExit(f"background_video not found: {bgv}")
+        print(f"[bg-video] extracting {n_frames_total} frames from {bgv.name} ...")
+        bg_frame_paths = _prepare_bg_video_frames(
+            bgv, n_frames_total, fps, output_path.parent / '.bg_frames')
+        print(f"[bg-video] {len(bg_frame_paths)} frames ready.")
+
+    # Optional static full-frame image background: painted behind the chart on
+    # every frame (loaded once). Takes effect only when no video bg is set.
+    bg_static = None
+    bg_image = render_cfg.get('background_image')
+    if bg_image and bg_frame_paths is None and not _is_single:
+        bgi = Path(bg_image)
+        if not bgi.is_absolute():
+            bgi = Path.cwd() / bgi
+        if not bgi.exists():
+            raise SystemExit(f"background_image not found: {bgi}")
+        bg_static = plt.imread(str(bgi))
+        print(f"[bg-image] static background: {bgi.name}")
 
     def update(frame_idx):
         ax.clear()
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.axis('off')
-        _draw_background(ax, theme, frame_idx=frame_idx, fps=fps,
-                         n_frames_total=n_frames_total,
-                         drift_period_frames=drift_period_frames)
+        if bg_frame_paths is not None:
+            bi = frame_idx if frame_idx < len(bg_frame_paths) else len(bg_frame_paths) - 1
+            ax.imshow(plt.imread(str(bg_frame_paths[bi])),
+                      extent=[0, 1, 0, 1], aspect='auto', zorder=-10)
+            # Dark scrim over the header zone so title/age/track stay legible
+            # when the video background is bright (e.g. stadium floodlights).
+            # Solid over the header, fading out just below it.
+            scrim = np.zeros((120, 1, 4), dtype=np.float32)
+            ys = np.linspace(1.0, 0.80, 120)  # row 0 = top of extent
+            solid_until, fade_until = 0.855, 0.80
+            scrim[..., 3] = (0.88 * np.clip(
+                (ys - fade_until) / (solid_until - fade_until), 0.0, 1.0))[:, None]
+            ax.imshow(scrim, extent=[0, 1, 0.80, 1.0], aspect='auto',
+                      origin='upper', zorder=-9, interpolation='bilinear')
+        elif bg_static is not None:
+            ax.imshow(bg_static, extent=[0, 1, 0, 1], aspect='auto', zorder=-10)
+            # Same header scrim as the video path so title/trend/year stay
+            # legible over a bright stadium image.
+            scrim = np.zeros((120, 1, 4), dtype=np.float32)
+            ys = np.linspace(1.0, 0.80, 120)
+            solid_until, fade_until = 0.855, 0.80
+            scrim[..., 3] = (0.88 * np.clip(
+                (ys - fade_until) / (solid_until - fade_until), 0.0, 1.0))[:, None]
+            ax.imshow(scrim, extent=[0, 1, 0.80, 1.0], aspect='auto',
+                      origin='upper', zorder=-9, interpolation='bilinear')
+        else:
+            _draw_background(ax, theme, frame_idx=frame_idx, fps=fps,
+                             n_frames_total=n_frames_total,
+                             drift_period_frames=drift_period_frames)
 
         scores = scores_df.iloc[frame_idx]
         ranks = ranks_df.iloc[frame_idx]
-        year_int = int(float(scores_df.index[frame_idx]))
+        if period_years is not None:
+            # Snap to the period the bars are racing toward (ceil), so the
+            # standings match the label exactly when each transition settles.
+            _i = int(np.ceil(float(scores_df.index[frame_idx]) - 1e-6))
+            year_int = period_years[max(0, min(_i, len(period_years) - 1))]
+        else:
+            year_int = int(float(scores_df.index[frame_idx]))
 
         max_val = float(scores.max())
         if not np.isfinite(max_val) or max_val <= 0:
@@ -733,6 +1014,7 @@ def render(data: pd.DataFrame,
                                 trend_label=trend_label,
                                 start_year=start_year,
                                 end_year=end_year,
+                                trend_from_zero=trend_from_zero,
                                 t_title=t_title,
                                 t_draw=t_draw,
                                 total_value=current_total,
@@ -741,7 +1023,15 @@ def render(data: pd.DataFrame,
                                 title_scale_fs=title_scale_fs,
                                 title_weight=title_weight,
                                 header_scale_fs=header_scale_fs,
-                                header_weight=header_weight)
+                                header_weight=header_weight,
+                                header_template=render_cfg.get('header_template', ''),
+                                header_timeline=bool(render_cfg.get('header_timeline', False)),
+                                timeline_label=render_cfg.get('timeline_label', 'AGE {year}'),
+                                timeline_endpoints=((period_years[0], period_years[-1])
+                                                    if period_years else None),
+                                timeline_pop=bool(render_cfg.get('timeline_pop', True)),
+                                header_y_offset=float(render_cfg.get('header_y_offset', 0.0)),
+                                year_frac=float(scores_df.index[frame_idx]))
 
         ax.text(0.04, SAFE_BOTTOM - 0.02, source_credit.upper(),
                 transform=ax.transAxes, ha='left', va='bottom',
@@ -799,12 +1089,33 @@ def render(data: pd.DataFrame,
             fracs = u * u * (3 - 2 * u)
             y_center = race_top - float(np.sum(fracs * visible_footprint))
 
-            card_h_i = weight * card_scale * race_intro_scale
+            # Intro reveal: 'cascade' staggers each row in top-to-bottom with a
+            # smooth ease-out cubic (no overshoot); default keeps the uniform
+            # back-ease bounce so the world channel is unchanged.
+            if intro_style == 'cascade':
+                _p = np.clip((state['frame'] - (dr - 1.0) * 3.5) / 16.0, 0.0, 1.0)
+                _p = 1.0 - (1.0 - _p) ** 3
+                this_intro_scale = 0.70 + 0.30 * _p
+                intro_alpha = _p
+            else:
+                this_intro_scale = race_intro_scale
+                intro_alpha = 1.0
+
+            card_h_i = weight * card_scale * this_intro_scale
             slot_h = card_h_i + row_gap
 
             entry_alpha = float(np.clip((n_on_screen + 0.5) - dr, 0.0, 1.0))
+            if total_countries <= n_on_screen:
+                # Every entity fits on screen, so nothing scrolls past the
+                # bottom edge — don't entry-fade the last row.
+                entry_alpha = 1.0
+            entry_alpha *= intro_alpha
             int_rank = int(round(dr))
             s = card_h_i / max_card_h_render if max_card_h_render > 0 else 1.0
+            # Alpha weight: lower rows dim with `s` by default. With
+            # row_fade disabled, hold text/rank at full opacity (font size
+            # still scales with `s`).
+            alpha_s = s if render_cfg.get('row_fade', True) else 1.0
 
             # Rank-change flash
             if theme.rank_flash and entry_alpha >= 0.95:
@@ -845,17 +1156,34 @@ def render(data: pd.DataFrame,
                     alpha=0.28 * flash_alpha * entry_alpha, zorder=2.5,
                 )
 
+            # Optional per-row sub-label (e.g. club · season at this age),
+            # keyed by entity then by the current integer period (year_int).
+            # When present it replaces the in-row sparkline for that row.
+            sub_labels = render_cfg.get('row_sublabels') or {}
+            sub_text = ''
+            if sub_labels:
+                _entry = sub_labels.get(country) or {}
+                sub_text = _entry.get(str(year_int)) or _entry.get(year_int) or ''
+
             # In-row sparkline: this country's own history up to now, drawn
             # in the bottom band of the name card so it sits under the text.
+            # With a sub-label the text stack fills the card, so draw the
+            # line faint across the full card height behind the text instead.
             if card_h >= 0.022 and frame_idx >= 2:
                 hist = country_hist[country][:frame_idx + 1]
                 xs_hist = spark_xs_full[:frame_idx + 1]
-                spark_bot = card_y + card_h * 0.08
-                spark_top = card_y + card_h * 0.44
+                if sub_text:
+                    spark_bot = card_y + card_h * 0.12
+                    spark_top = card_y + card_h * 0.88
+                    spark_alpha, spark_lw = 0.28, 2.0
+                else:
+                    spark_bot = card_y + card_h * 0.08
+                    spark_top = card_y + card_h * 0.44
+                    spark_alpha, spark_lw = 0.55, 1.4
                 ys_hist = spark_bot + hist * (spark_top - spark_bot)
                 ax.plot(xs_hist, ys_hist,
-                        color=theme.text_primary, linewidth=1.4,
-                        alpha=0.55 * entry_alpha, zorder=2.6,
+                        color=theme.text_primary, linewidth=spark_lw,
+                        alpha=spark_alpha * entry_alpha, zorder=2.6,
                         solid_capstyle='round')
 
             rank_fs = _lerp(14, 28, s) * row_scale_fs
@@ -863,17 +1191,50 @@ def render(data: pd.DataFrame,
                     ha='right', va='center',
                     color=theme.text_primary,
                     fontsize=rank_fs, fontweight=row_weight,
-                    alpha=_lerp(0.55, 0.95, s) * entry_alpha,
+                    alpha=_lerp(0.55, 0.95, alpha_s) * entry_alpha,
                     fontfamily=theme.font_family, zorder=4)
 
             name_fs = _lerp(13, 21, s) * row_scale_fs
             label = display_name(country, max_chars=name_max_chars).upper()
-            ax.text(columns.name_left, y_center, label,
-                    ha='left', va='center',
-                    color=theme.text_primary,
-                    fontsize=name_fs, fontweight=row_weight,
-                    alpha=_lerp(0.9, 1.0, s) * entry_alpha,
-                    fontfamily=theme.font_family, zorder=5)
+            if sub_text:
+                # Three-line stack centred on y_center: NAME / CLUB / YEAR.
+                # sub_text is "CLUB, YEAR"; split it onto its own two lines.
+                club_str, _, year_str = sub_text.partition(', ')
+                club_fs = _lerp(12, 17, s) * row_scale_fs
+                year_fs = _lerp(11, 15, s) * row_scale_fs
+                gap = 6.5  # px between lines
+                d_nc = name_fs * 0.5 + gap + club_fs * 0.5   # name→club center gap
+                d_cy = club_fs * 0.5 + gap + year_fs * 0.5   # club→year center gap
+                total = name_fs * 0.5 + d_nc + d_cy + year_fs * 0.5  # block height px
+                name_y = y_center + (total * 0.5 - name_fs * 0.5) / FIG_H_PX
+                club_y = name_y - d_nc / FIG_H_PX
+                year_y = club_y - d_cy / FIG_H_PX
+                ax.text(columns.name_left, name_y, label,
+                        ha='left', va='center',
+                        color=theme.text_primary,
+                        fontsize=name_fs, fontweight=row_weight,
+                        alpha=_lerp(0.9, 1.0, alpha_s) * entry_alpha,
+                        fontfamily=theme.font_family, zorder=5)
+                ax.text(columns.name_left, club_y, club_str,
+                        ha='left', va='center',
+                        color=theme.text_primary,
+                        fontsize=club_fs, fontweight='bold',
+                        alpha=_lerp(0.85, 0.98, alpha_s) * entry_alpha,
+                        fontfamily=theme.font_family, zorder=5)
+                if year_str:
+                    ax.text(columns.name_left, year_y, year_str,
+                            ha='left', va='center',
+                            color=theme.text_secondary,
+                            fontsize=year_fs, fontweight='bold',
+                            alpha=_lerp(0.8, 0.95, alpha_s) * entry_alpha,
+                            fontfamily=theme.font_family, zorder=5)
+            else:
+                ax.text(columns.name_left, y_center, label,
+                        ha='left', va='center',
+                        color=theme.text_primary,
+                        fontsize=name_fs, fontweight=row_weight,
+                        alpha=_lerp(0.9, 1.0, alpha_s) * entry_alpha,
+                        fontfamily=theme.font_family, zorder=5)
 
             # Right-edge badge inside the name card: per-window rate or
             # retirement marker. Skipped when the card is too short to fit
@@ -891,7 +1252,10 @@ def render(data: pd.DataFrame,
                         badge_text = f"+{int(round(rv))}{row_rate_label}"
                 if badge_text:
                     badge_x = columns.name_box_right - 0.012
-                    badge_y = y_center + card_h * 0.28
+                    # With a sublabel the name line fills the top of the card;
+                    # park the badge bottom-right next to the sublabel instead.
+                    badge_y = (y_center - card_h * 0.28 if sub_text
+                               else y_center + card_h * 0.28)
                     badge_fs = _lerp(11, 17, s) * row_scale_fs
                     ax.text(badge_x, badge_y, badge_text,
                             ha='right', va='center',
@@ -940,24 +1304,33 @@ def render(data: pd.DataFrame,
                           clip_on=False)
 
             value_fs = _lerp(14, 24, s) * row_scale_fs
-            value_str = (format_value(value, value_format).upper() + (' ' + value_suffix if value_suffix else ''))
+            _num = format_value(value, value_format).upper()
+            if not _num and show_zero_values and np.isfinite(value):
+                _num = '0'
+            # Only append the unit when there's a number, so a blank value
+            # never renders as an orphan " goals". Singularize the unit for
+            # exactly 1 ("1 goal", not "1 goals").
+            _suffix = value_suffix[:-1] if (_num == '1' and value_suffix.endswith('s')) else value_suffix
+            value_str = (_num + (' ' + _suffix if _suffix else '')) if _num else ''
             gap = 0.012
             min_allowed_left = columns.track_left + 0.025
 
             # Decide the side using the *final* (non-intro-scaled) geometry so the
             # value text doesn't flip sides as the row scales up during intro.
-            draw_h_final = (card_h_i / race_intro_scale) * 0.96 if race_intro_scale > 0 else draw_h
+            draw_h_final = (card_h_i / this_intro_scale) * 0.96 if this_intro_scale > 0 else draw_h
             draw_w_final = draw_h_final * (iw / ih) * (FIG_H_PX / FIG_W_PX) if icon is not None else 0.0
             fx_final = track_position(
                 eff(value), eff_max,
                 columns.track_left, columns.track_right,
                 draw_w_final,
             )
-            s_final = (card_h_i / race_intro_scale) / max_card_h_render if (
-                race_intro_scale > 0 and max_card_h_render > 0) else s
+            s_final = (card_h_i / this_intro_scale) / max_card_h_render if (
+                this_intro_scale > 0 and max_card_h_render > 0) else s
             value_fs_final = _lerp(14, 24, s_final) * row_scale_fs
             approx_text_w_final = len(value_str) * (value_fs_final * 0.68 / FIG_W_PX)
             place_left = (fx_final - gap - approx_text_w_final) >= min_allowed_left
+            if value_always_right:
+                place_left = False
 
             if place_left:
                 ax.text(fx - gap, y_center, value_str,
@@ -1112,15 +1485,24 @@ def render(data: pd.DataFrame,
             out_dir.mkdir(parents=True, exist_ok=True)
             for year in single_frame_years:
                 target = float(year)
+                if period_years is not None:
+                    target = float(np.argmin(np.abs(
+                        np.asarray(period_years, dtype=float) - target)))
                 frame_idx = int(np.argmin(np.abs(idx - target)))
                 state['frame'] = 200
                 update(frame_idx)
-                year_label = f"{idx[frame_idx]:.0f}"
+                if period_years is not None:
+                    year_label = str(period_years[int(round(idx[frame_idx]))])
+                else:
+                    year_label = f"{idx[frame_idx]:.0f}"
                 png = out_dir / f"{year_label}.png"
                 fig.savefig(str(png), dpi=DPI, facecolor='#000000')
                 print(f"Preview frame saved → {png} (year≈{idx[frame_idx]:.2f})")
         else:
             target = float(single_frame_year)
+            if period_years is not None:
+                target = float(np.argmin(np.abs(
+                    np.asarray(period_years, dtype=float) - target)))
             frame_idx = int(np.argmin(np.abs(idx - target)))
             png = single_frame_png_path or (output_path.parent / 'preview_frame.png')
             png.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,84 @@
+{
+  "video_title": "GOALS BY AGE 19",
+  "value_format": "goals",
+  "output_filename": "goals_by_age.mp4",
+  "theme": "glass_dark_black",
+  "preview_timeframe": null,
+  "source": {
+    "type": "players_csv",
+    "path": "sportstatsraces/data/goals_by_age.csv",
+    "entity_col": "player",
+    "period_col": "age",
+    "value_col": "goals",
+    "timeframe": [15, 18],
+    "source_credit": "Source: Transfermarkt, Wikipedia",
+    "icon_ids": {
+      "Messi": "messi",
+      "Cristiano": "ronaldo",
+      "Yamal": "yamal",
+      "Mbappe": "mbappe",
+      "Neymar": "neymar",
+      "Ronaldo": "r9"
+    }
+  },
+  "assets": {
+    "type": "headshots"
+  },
+  "render": {
+    "top_n_on_screen": 6,
+    "steps_per_year": 187,
+    "fps": 30,
+    "bitrate": 8000,
+    "rank_smooth_window_a": 10,
+    "rank_smooth_window_b": 15,
+    "row_min_weight": 0.45,
+    "flag_corner_radius_frac": 0.08,
+    "show_total_trend": true,
+    "trend_mode": "leader",
+    "trend_label": "Record at this age",
+    "trend_from_zero": true,
+    "end_period_offset": 1,
+    "race_top": 0.72,
+    "race_bottom": 0.10,
+    "spotlight": {"enabled": false},
+    "show_row_rate": false,
+    "show_retirement": false,
+    "row_fade": false,
+    "value_suffix": "goals",
+    "value_always_right": true,
+    "show_zero_values": true,
+    "header_template": "",
+    "header_timeline": false,
+    "intro_style": "cascade",
+    "font_scale": 1.0,
+    "background_image": "stadium_bg_dark.png",
+    "narration": {
+      "enabled": true,
+      "tts": {
+        "provider": "elevenlabs",
+        "voice_id": "QpDQJR3frbDwOhTIo8nW",
+        "model_id": "eleven_turbo_v2_5",
+        "stability": 0.3,
+        "style": 0.6,
+        "similarity_boost": 0.9,
+        "speed": 1.15
+      },
+      "tail_buffer_seconds": 1.5,
+      "background_music": {
+        "path": "Gridiron_Velocity_2026-07-04T142733.mp3",
+        "voice_volume_db": 0.0,
+        "music_volume_db": -15.0,
+        "fade_in_seconds": 0.5,
+        "fade_out_seconds": 1.5
+      }
+    },
+    "row_sublabels": {
+      "Messi":     {"15": "BARCELONA, 2002-03", "16": "BARCELONA, 2003-04", "17": "BARCELONA, 2004-05", "18": "BARCELONA, 2005-06", "19": "BARCELONA, 2006-07"},
+      "Cristiano": {"15": "SPORTING, 2000-01",  "16": "SPORTING, 2001-02",  "17": "SPORTING, 2002-03",  "18": "MAN UTD, 2003-04",   "19": "MAN UTD, 2004-05"},
+      "Yamal":     {"15": "BARCELONA, 2022-23", "16": "BARCELONA, 2023-24", "17": "BARCELONA, 2024-25", "18": "BARCELONA, 2025-26", "19": "BARCELONA, TURNING 19"},
+      "Mbappe":    {"15": "MONACO, 2014-15",    "16": "MONACO, 2015-16",    "17": "MONACO, 2016-17",    "18": "MONACO/PSG, 2017",   "19": "PSG, 2018"},
+      "Neymar":    {"15": "SANTOS, 2007",       "16": "SANTOS, 2008",       "17": "SANTOS, 2009",       "18": "SANTOS, 2010",       "19": "SANTOS, 2011"},
+      "Ronaldo":   {"15": "SAO CRISTOVAO, 1992","16": "CRUZEIRO, 1993",     "17": "CRUZEIRO, 1994",     "18": "PSV, 1994-95",       "19": "PSV, 1995-96"}
+    }
+  }
+}

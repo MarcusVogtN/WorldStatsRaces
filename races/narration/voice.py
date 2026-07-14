@@ -52,13 +52,17 @@ def _probe_audio_seconds(audio_path: Path) -> float:
     return last_t
 
 
-def _script_hash(text: str, voice_id: str, model_id: str) -> str:
+def _script_hash(text: str, voice_id: str, model_id: str,
+                 settings: str = "") -> str:
     h = hashlib.sha256()
     h.update(text.encode("utf-8"))
     h.update(b"|")
     h.update(voice_id.encode("utf-8"))
     h.update(b"|")
     h.update(model_id.encode("utf-8"))
+    if settings:
+        h.update(b"|")
+        h.update(settings.encode("utf-8"))
     return h.hexdigest()[:16]
 
 
@@ -85,7 +89,8 @@ def synthesize_voice(*,
 
     script_text = script_doc["script_text"]
     clips_dir.mkdir(parents=True, exist_ok=True)
-    key = _script_hash(script_text, voice_id, model_id)
+    key = _script_hash(script_text, voice_id, model_id,
+                       settings=f"{stability}|{style}|{similarity}|{speed}")
     voice_mp3 = clips_dir / f"{key}.mp3"
 
     if not voice_mp3.exists():
