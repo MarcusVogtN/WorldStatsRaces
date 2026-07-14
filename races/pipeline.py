@@ -11,6 +11,7 @@ from .assets import build_provider
 from .assets.fonts import ensure_orbitron
 from .render import render, get_theme
 from .render.layout import auto_size_columns
+from .paths import output_dir as _output_dir
 
 
 def _archive_narration(cache_dir: Path) -> None:
@@ -60,7 +61,7 @@ def run(config_path: Path, *, refetch: bool = False,
 
     repo_root = config_path.parent
     cache_dir = repo_root / 'cache'
-    output_dir = repo_root / 'output'
+    output_dir = _output_dir(repo_root)
     cache_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 

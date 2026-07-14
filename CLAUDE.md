@@ -53,6 +53,8 @@ a soccer-fan audience.
    headshot corners, and a header trend line.
 6. Support per-row "rate" badges and "retired" flagging for monotonically
    non-decreasing series (opt-in; only meaningful for cumulative datasets).
+   A `row_rate_style: "percent"` variant shows signed window-over-window
+   growth (green "+N%" / red "-N%") for level series like market caps.
 7. Support typography control (global `font_scale` + per-section size/weight
    overrides). Defer aggressive simplification of this surface until the
    production template is locked.
@@ -220,6 +222,7 @@ worldbankraces/
 ├── config.json               world-stats config
 ├── ideas.md                  world-stats backlog
 ├── races/                    shared render engine + WB pipeline + narration
+│   ├── paths.py              resolves the output dir (Google Drive by default)
 │   ├── pipeline.py           world-stats orchestrator
 │   ├── render/               renderer, themes, layout, big-movers
 │   ├── sources/              DataSource ABC + WorldBankSource
@@ -240,7 +243,12 @@ worldbankraces/
 │   └── youtube/              gitignored — OAuth client_secret + per-channel
 │                             refresh tokens (credentials_world.json,
 │                             credentials_sports.json)
-├── output/                   gitignored — rendered mp4s + manifest sidecars
+├── output/                   local fallback for rendered mp4s + manifest
+│                             sidecars. Both pipelines resolve their output dir
+│                             via races/paths.py, which defaults to
+│                             `G:\My Drive\WorldBankRaces\output` (Google Drive)
+│                             and only falls back to this local folder when
+│                             Drive isn't mounted. Override with WBR_OUTPUT_DIR.
 ├── post-dumb-minimized-audit.md   the live deletion hit-list
 └── .claude/skills/           Claude Code skills that operate this pipeline
     ├── make-world-stats-video/   end-to-end recipe for the world channel

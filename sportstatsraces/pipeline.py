@@ -16,6 +16,7 @@ from races.assets import build_provider
 from races.assets.fonts import ensure_orbitron
 from races.render import render, get_theme
 from races.render.layout import auto_size_columns
+from races.paths import output_dir as _output_dir
 from races.sources import build_source
 
 
@@ -61,7 +62,7 @@ def run(config_path: Path, *,
     cfg = json.loads(Path(config_path).read_text(encoding='utf-8'))
     repo_root = Path(config_path).resolve().parent
     cache_dir = repo_root / 'cache'
-    output_dir = repo_root / 'output'
+    output_dir = _output_dir(repo_root)
     cache_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -222,7 +223,11 @@ def run(config_path: Path, *,
         tail_buffer = float(narration_cfg.get('tail_buffer_seconds', 1.5))
         seasons = result.data.index.tolist()
         season_count = max(2, len(seasons))
-        target_body_frames = max(int(round(voice_seconds * fps)), season_count)
+        # Optional floor on body length (e.g. to fill a background video's
+        # motion window even when the voice track runs shorter).
+        min_body = float(narration_cfg.get('min_body_seconds', 0.0) or 0.0)
+        target_body_frames = max(int(round(voice_seconds * fps)),
+                                 int(round(min_body * fps)), season_count)
         spy_override = max(2, int(round((target_body_frames - 1) / (season_count - 1))))
         render_cfg['steps_per_year'] = spy_override
         render_cfg['end_hold_seconds'] = tail_buffer

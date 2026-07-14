@@ -6,3 +6,17 @@ output/
 .env
 .claude/scheduled_tasks.lock
 *-dumb-minimized-audit.md
+
+# Large binary / generated assets — kept local, never committed
+*.mp3
+*.wav
+*.zip
+*.bak
+.firecrawl/
+cache_new2026.json
+races/assets/backgrounds/
+sportstatsraces/FIFA dbs/
+sportstatsraces/data/
+sportstatsraces/crowd_sounds/
+sportstatsraces/assets/stadium_bg.png
+stadium_bg_dark.png

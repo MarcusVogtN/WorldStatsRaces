@@ -1,0 +1,703 @@
+Company,Year,MarketCapB
+Apple,2000,5
+Apple,2001,8
+Apple,2002,5
+Apple,2003,8
+Apple,2004,26
+Apple,2005,61
+Apple,2006,72
+Apple,2007,174
+Apple,2008,76
+Apple,2009,190
+Apple,2010,296
+Apple,2011,377
+Apple,2012,500
+Apple,2013,500
+Apple,2014,643
+Apple,2015,587
+Apple,2016,617
+Apple,2017,861
+Apple,2018,749
+Apple,2019,1287
+Apple,2020,2255
+Apple,2021,2913
+Apple,2022,2066
+Apple,2023,2994
+Apple,2024,3785
+Apple,2025,4000
+Microsoft,2000,231
+Microsoft,2001,358
+Microsoft,2002,277
+Microsoft,2003,295
+Microsoft,2004,291
+Microsoft,2005,278
+Microsoft,2006,293
+Microsoft,2007,333
+Microsoft,2008,173
+Microsoft,2009,271
+Microsoft,2010,235
+Microsoft,2011,218
+Microsoft,2012,224
+Microsoft,2013,311
+Microsoft,2014,382
+Microsoft,2015,443
+Microsoft,2016,483
+Microsoft,2017,660
+Microsoft,2018,780
+Microsoft,2019,1200
+Microsoft,2020,1682
+Microsoft,2021,2525
+Microsoft,2022,1787
+Microsoft,2023,2795
+Microsoft,2024,3133
+Microsoft,2025,3700
+Nvidia,2000,4
+Nvidia,2001,8
+Nvidia,2002,2
+Nvidia,2003,4
+Nvidia,2004,4
+Nvidia,2005,6
+Nvidia,2006,13
+Nvidia,2007,19
+Nvidia,2008,4
+Nvidia,2009,10
+Nvidia,2010,9
+Nvidia,2011,8
+Nvidia,2012,8
+Nvidia,2013,9
+Nvidia,2014,11
+Nvidia,2015,18
+Nvidia,2016,58
+Nvidia,2017,117
+Nvidia,2018,81
+Nvidia,2019,144
+Nvidia,2020,323
+Nvidia,2021,735
+Nvidia,2022,359
+Nvidia,2023,1223
+Nvidia,2024,3288
+Nvidia,2025,4400
+Google,2000,0
+Google,2001,0
+Google,2002,0
+Google,2003,0
+Google,2004,52
+Google,2005,123
+Google,2006,141
+Google,2007,217
+Google,2008,97
+Google,2009,197
+Google,2010,190
+Google,2011,209
+Google,2012,232
+Google,2013,375
+Google,2014,360
+Google,2015,528
+Google,2016,539
+Google,2017,729
+Google,2018,724
+Google,2019,921
+Google,2020,1185
+Google,2021,1917
+Google,2022,1145
+Google,2023,1756
+Google,2024,2330
+Google,2025,3500
+Amazon,2000,6
+Amazon,2001,4
+Amazon,2002,7
+Amazon,2003,21
+Amazon,2004,18
+Amazon,2005,20
+Amazon,2006,16
+Amazon,2007,39
+Amazon,2008,22
+Amazon,2009,58
+Amazon,2010,81
+Amazon,2011,79
+Amazon,2012,114
+Amazon,2013,183
+Amazon,2014,144
+Amazon,2015,318
+Amazon,2016,356
+Amazon,2017,564
+Amazon,2018,734
+Amazon,2019,916
+Amazon,2020,1634
+Amazon,2021,1691
+Amazon,2022,857
+Amazon,2023,1570
+Amazon,2024,2306
+Amazon,2025,2400
+GE,2000,475
+GE,2001,398
+GE,2002,245
+GE,2003,311
+GE,2004,386
+GE,2005,370
+GE,2006,383
+GE,2007,375
+GE,2008,161
+GE,2009,160
+GE,2010,194
+GE,2011,190
+GE,2012,218
+GE,2013,282
+GE,2014,254
+GE,2015,294
+GE,2016,279
+GE,2017,151
+GE,2018,66
+GE,2019,97
+GE,2020,94
+GE,2021,104
+GE,2022,71
+GE,2023,124
+GE,2024,180
+GE,2025,290
+Exxon,2000,302
+Exxon,2001,268
+Exxon,2002,235
+Exxon,2003,271
+Exxon,2004,328
+Exxon,2005,344
+Exxon,2006,447
+Exxon,2007,512
+Exxon,2008,406
+Exxon,2009,323
+Exxon,2010,369
+Exxon,2011,406
+Exxon,2012,395
+Exxon,2013,438
+Exxon,2014,388
+Exxon,2015,324
+Exxon,2016,374
+Exxon,2017,354
+Exxon,2018,288
+Exxon,2019,295
+Exxon,2020,174
+Exxon,2021,259
+Exxon,2022,454
+Exxon,2023,400
+Exxon,2024,470
+Exxon,2025,490
+Walmart,2000,265
+Walmart,2001,276
+Walmart,2002,223
+Walmart,2003,229
+Walmart,2004,223
+Walmart,2005,195
+Walmart,2006,187
+Walmart,2007,197
+Walmart,2008,219
+Walmart,2009,200
+Walmart,2010,191
+Walmart,2011,205
+Walmart,2012,228
+Walmart,2013,254
+Walmart,2014,277
+Walmart,2015,197
+Walmart,2016,213
+Walmart,2017,296
+Walmart,2018,264
+Walmart,2019,337
+Walmart,2020,407
+Walmart,2021,400
+Walmart,2022,383
+Walmart,2023,424
+Walmart,2024,726
+Walmart,2025,850
+Citigroup,2000,275
+Citigroup,2001,261
+Citigroup,2002,181
+Citigroup,2003,250
+Citigroup,2004,250
+Citigroup,2005,245
+Citigroup,2006,274
+Citigroup,2007,147
+Citigroup,2008,37
+Citigroup,2009,76
+Citigroup,2010,137
+Citigroup,2011,77
+Citigroup,2012,116
+Citigroup,2013,158
+Citigroup,2014,164
+Citigroup,2015,157
+Citigroup,2016,170
+Citigroup,2017,198
+Citigroup,2018,131
+Citigroup,2019,180
+Citigroup,2020,128
+Citigroup,2021,122
+Citigroup,2022,88
+Citigroup,2023,98
+Citigroup,2024,134
+Citigroup,2025,180
+Pfizer,2000,290
+Pfizer,2001,251
+Pfizer,2002,188
+Pfizer,2003,269
+Pfizer,2004,202
+Pfizer,2005,172
+Pfizer,2006,184
+Pfizer,2007,154
+Pfizer,2008,119
+Pfizer,2009,147
+Pfizer,2010,140
+Pfizer,2011,166
+Pfizer,2012,184
+Pfizer,2013,196
+Pfizer,2014,196
+Pfizer,2015,199
+Pfizer,2016,197
+Pfizer,2017,216
+Pfizer,2018,252
+Pfizer,2019,217
+Pfizer,2020,205
+Pfizer,2021,331
+Pfizer,2022,288
+Pfizer,2023,163
+Pfizer,2024,150
+Pfizer,2025,140
+Cisco,2000,275
+Cisco,2001,132
+Cisco,2002,95
+Cisco,2003,165
+Cisco,2004,126
+Cisco,2005,105
+Cisco,2006,166
+Cisco,2007,164
+Cisco,2008,95
+Cisco,2009,138
+Cisco,2010,112
+Cisco,2011,97
+Cisco,2012,104
+Cisco,2013,118
+Cisco,2014,142
+Cisco,2015,138
+Cisco,2016,152
+Cisco,2017,189
+Cisco,2018,195
+Cisco,2019,203
+Cisco,2020,189
+Cisco,2021,267
+Cisco,2022,196
+Cisco,2023,205
+Cisco,2024,236
+Cisco,2025,280
+Intel,2000,202
+Intel,2001,211
+Intel,2002,104
+Intel,2003,210
+Intel,2004,150
+Intel,2005,153
+Intel,2006,117
+Intel,2007,155
+Intel,2008,82
+Intel,2009,113
+Intel,2010,116
+Intel,2011,123
+Intel,2012,103
+Intel,2013,129
+Intel,2014,180
+Intel,2015,163
+Intel,2016,172
+Intel,2017,216
+Intel,2018,214
+Intel,2019,263
+Intel,2020,206
+Intel,2021,209
+Intel,2022,108
+Intel,2023,212
+Intel,2024,86
+Intel,2025,170
+IBM,2000,149
+IBM,2001,208
+IBM,2002,131
+IBM,2003,159
+IBM,2004,165
+IBM,2005,129
+IBM,2006,145
+IBM,2007,149
+IBM,2008,113
+IBM,2009,171
+IBM,2010,182
+IBM,2011,217
+IBM,2012,216
+IBM,2013,197
+IBM,2014,158
+IBM,2015,135
+IBM,2016,158
+IBM,2017,142
+IBM,2018,103
+IBM,2019,119
+IBM,2020,112
+IBM,2021,120
+IBM,2022,127
+IBM,2023,150
+IBM,2024,203
+IBM,2025,280
+Johnson & Johnson,2000,130
+Johnson & Johnson,2001,181
+Johnson & Johnson,2002,160
+Johnson & Johnson,2003,154
+Johnson & Johnson,2004,189
+Johnson & Johnson,2005,179
+Johnson & Johnson,2006,190
+Johnson & Johnson,2007,189
+Johnson & Johnson,2008,166
+Johnson & Johnson,2009,178
+Johnson & Johnson,2010,170
+Johnson & Johnson,2011,179
+Johnson & Johnson,2012,194
+Johnson & Johnson,2013,258
+Johnson & Johnson,2014,292
+Johnson & Johnson,2015,284
+Johnson & Johnson,2016,313
+Johnson & Johnson,2017,375
+Johnson & Johnson,2018,346
+Johnson & Johnson,2019,384
+Johnson & Johnson,2020,414
+Johnson & Johnson,2021,450
+Johnson & Johnson,2022,462
+Johnson & Johnson,2023,377
+Johnson & Johnson,2024,348
+Johnson & Johnson,2025,450
+Berkshire,2000,100
+Berkshire,2001,116
+Berkshire,2002,111
+Berkshire,2003,130
+Berkshire,2004,135
+Berkshire,2005,135
+Berkshire,2006,168
+Berkshire,2007,220
+Berkshire,2008,150
+Berkshire,2009,154
+Berkshire,2010,199
+Berkshire,2011,189
+Berkshire,2012,220
+Berkshire,2013,292
+Berkshire,2014,371
+Berkshire,2015,325
+Berkshire,2016,401
+Berkshire,2017,489
+Berkshire,2018,502
+Berkshire,2019,553
+Berkshire,2020,545
+Berkshire,2021,668
+Berkshire,2022,688
+Berkshire,2023,777
+Berkshire,2024,976
+Berkshire,2025,1080
+Toyota,2000,120
+Toyota,2001,95
+Toyota,2002,90
+Toyota,2003,110
+Toyota,2004,130
+Toyota,2005,160
+Toyota,2006,230
+Toyota,2007,175
+Toyota,2008,100
+Toyota,2009,130
+Toyota,2010,120
+Toyota,2011,110
+Toyota,2012,135
+Toyota,2013,190
+Toyota,2014,200
+Toyota,2015,180
+Toyota,2016,170
+Toyota,2017,190
+Toyota,2018,170
+Toyota,2019,200
+Toyota,2020,215
+Toyota,2021,255
+Toyota,2022,220
+Toyota,2023,245
+Toyota,2024,280
+Toyota,2025,290
+PetroChina,2000,35
+PetroChina,2001,35
+PetroChina,2002,40
+PetroChina,2003,70
+PetroChina,2004,90
+PetroChina,2005,180
+PetroChina,2006,230
+PetroChina,2007,724
+PetroChina,2008,260
+PetroChina,2009,353
+PetroChina,2010,303
+PetroChina,2011,277
+PetroChina,2012,255
+PetroChina,2013,230
+PetroChina,2014,330
+PetroChina,2015,220
+PetroChina,2016,200
+PetroChina,2017,230
+PetroChina,2018,210
+PetroChina,2019,150
+PetroChina,2020,100
+PetroChina,2021,140
+PetroChina,2022,130
+PetroChina,2023,180
+PetroChina,2024,230
+PetroChina,2025,240
+Meta,2000,0
+Meta,2001,0
+Meta,2002,0
+Meta,2003,0
+Meta,2004,0
+Meta,2005,0
+Meta,2006,0
+Meta,2007,0
+Meta,2008,0
+Meta,2009,0
+Meta,2010,0
+Meta,2011,0
+Meta,2012,63
+Meta,2013,139
+Meta,2014,217
+Meta,2015,296
+Meta,2016,332
+Meta,2017,513
+Meta,2018,374
+Meta,2019,585
+Meta,2020,778
+Meta,2021,936
+Meta,2022,320
+Meta,2023,909
+Meta,2024,1478
+Meta,2025,1600
+Tesla,2000,0
+Tesla,2001,0
+Tesla,2002,0
+Tesla,2003,0
+Tesla,2004,0
+Tesla,2005,0
+Tesla,2006,0
+Tesla,2007,0
+Tesla,2008,0
+Tesla,2009,0
+Tesla,2010,3
+Tesla,2011,3
+Tesla,2012,4
+Tesla,2013,18
+Tesla,2014,28
+Tesla,2015,31
+Tesla,2016,34
+Tesla,2017,52
+Tesla,2018,57
+Tesla,2019,76
+Tesla,2020,669
+Tesla,2021,1061
+Tesla,2022,389
+Tesla,2023,790
+Tesla,2024,1296
+Tesla,2025,1400
+Tencent,2000,0
+Tencent,2001,0
+Tencent,2002,0
+Tencent,2003,0
+Tencent,2004,2
+Tencent,2005,3
+Tencent,2006,6
+Tencent,2007,14
+Tencent,2008,15
+Tencent,2009,35
+Tencent,2010,40
+Tencent,2011,45
+Tencent,2012,60
+Tencent,2013,120
+Tencent,2014,135
+Tencent,2015,180
+Tencent,2016,230
+Tencent,2017,494
+Tencent,2018,383
+Tencent,2019,460
+Tencent,2020,683
+Tencent,2021,560
+Tencent,2022,379
+Tencent,2023,355
+Tencent,2024,490
+Tencent,2025,600
+Alibaba,2000,0
+Alibaba,2001,0
+Alibaba,2002,0
+Alibaba,2003,0
+Alibaba,2004,0
+Alibaba,2005,0
+Alibaba,2006,0
+Alibaba,2007,0
+Alibaba,2008,0
+Alibaba,2009,0
+Alibaba,2010,0
+Alibaba,2011,0
+Alibaba,2012,0
+Alibaba,2013,0
+Alibaba,2014,256
+Alibaba,2015,200
+Alibaba,2016,220
+Alibaba,2017,440
+Alibaba,2018,355
+Alibaba,2019,569
+Alibaba,2020,630
+Alibaba,2021,320
+Alibaba,2022,230
+Alibaba,2023,190
+Alibaba,2024,200
+Alibaba,2025,280
+Saudi Aramco,2000,0
+Saudi Aramco,2001,0
+Saudi Aramco,2002,0
+Saudi Aramco,2003,0
+Saudi Aramco,2004,0
+Saudi Aramco,2005,0
+Saudi Aramco,2006,0
+Saudi Aramco,2007,0
+Saudi Aramco,2008,0
+Saudi Aramco,2009,0
+Saudi Aramco,2010,0
+Saudi Aramco,2011,0
+Saudi Aramco,2012,0
+Saudi Aramco,2013,0
+Saudi Aramco,2014,0
+Saudi Aramco,2015,0
+Saudi Aramco,2016,0
+Saudi Aramco,2017,0
+Saudi Aramco,2018,0
+Saudi Aramco,2019,1880
+Saudi Aramco,2020,1935
+Saudi Aramco,2021,1979
+Saudi Aramco,2022,1900
+Saudi Aramco,2023,2130
+Saudi Aramco,2024,1800
+Saudi Aramco,2025,1600
+TSMC,2000,60
+TSMC,2001,55
+TSMC,2002,40
+TSMC,2003,55
+TSMC,2004,45
+TSMC,2005,50
+TSMC,2006,55
+TSMC,2007,60
+TSMC,2008,40
+TSMC,2009,60
+TSMC,2010,65
+TSMC,2011,65
+TSMC,2012,85
+TSMC,2013,90
+TSMC,2014,115
+TSMC,2015,110
+TSMC,2016,150
+TSMC,2017,200
+TSMC,2018,190
+TSMC,2019,290
+TSMC,2020,565
+TSMC,2021,623
+TSMC,2022,386
+TSMC,2023,540
+TSMC,2024,1024
+TSMC,2025,1500
+Eli Lilly,2000,85
+Eli Lilly,2001,90
+Eli Lilly,2002,70
+Eli Lilly,2003,80
+Eli Lilly,2004,65
+Eli Lilly,2005,65
+Eli Lilly,2006,60
+Eli Lilly,2007,60
+Eli Lilly,2008,45
+Eli Lilly,2009,40
+Eli Lilly,2010,40
+Eli Lilly,2011,48
+Eli Lilly,2012,55
+Eli Lilly,2013,57
+Eli Lilly,2014,77
+Eli Lilly,2015,93
+Eli Lilly,2016,81
+Eli Lilly,2017,93
+Eli Lilly,2018,118
+Eli Lilly,2019,127
+Eli Lilly,2020,161
+Eli Lilly,2021,264
+Eli Lilly,2022,348
+Eli Lilly,2023,553
+Eli Lilly,2024,733
+Eli Lilly,2025,950
+Broadcom,2000,0
+Broadcom,2001,0
+Broadcom,2002,0
+Broadcom,2003,0
+Broadcom,2004,0
+Broadcom,2005,0
+Broadcom,2006,0
+Broadcom,2007,0
+Broadcom,2008,0
+Broadcom,2009,5
+Broadcom,2010,7
+Broadcom,2011,7
+Broadcom,2012,8
+Broadcom,2013,13
+Broadcom,2014,26
+Broadcom,2015,40
+Broadcom,2016,70
+Broadcom,2017,105
+Broadcom,2018,100
+Broadcom,2019,126
+Broadcom,2020,177
+Broadcom,2021,274
+Broadcom,2022,233
+Broadcom,2023,520
+Broadcom,2024,1086
+Broadcom,2025,1600
+Nokia,2000,222
+Nokia,2001,104
+Nokia,2002,73
+Nokia,2003,80
+Nokia,2004,60
+Nokia,2005,75
+Nokia,2006,82
+Nokia,2007,151
+Nokia,2008,57
+Nokia,2009,47
+Nokia,2010,38
+Nokia,2011,22
+Nokia,2012,15
+Nokia,2013,30
+Nokia,2014,29
+Nokia,2015,27
+Nokia,2016,27
+Nokia,2017,23
+Nokia,2018,32
+Nokia,2019,20
+Nokia,2020,22
+Nokia,2021,32
+Nokia,2022,26
+Nokia,2023,19
+Nokia,2024,23
+Nokia,2025,30
+China Mobile,2000,95
+China Mobile,2001,75
+China Mobile,2002,55
+China Mobile,2003,70
+China Mobile,2004,75
+China Mobile,2005,95
+China Mobile,2006,170
+China Mobile,2007,350
+China Mobile,2008,180
+China Mobile,2009,190
+China Mobile,2010,190
+China Mobile,2011,195
+China Mobile,2012,230
+China Mobile,2013,215
+China Mobile,2014,230
+China Mobile,2015,230
+China Mobile,2016,215
+China Mobile,2017,205
+China Mobile,2018,190
+China Mobile,2019,170
+China Mobile,2020,120
+China Mobile,2021,120
+China Mobile,2022,130
+China Mobile,2023,180
+China Mobile,2024,220
+China Mobile,2025,230

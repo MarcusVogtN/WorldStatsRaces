@@ -74,7 +74,7 @@ def smoothstep(t: float) -> float:
 # Auto-name-box sizing — used by both pipelines so long-name datasets
 # (footballer rosters, full country names) don't get truncated unnecessarily.
 _NAME_FS_MAX = 21.0
-_CHAR_W_FRAC = _NAME_FS_MAX * 0.82 / 1080.0
+_CHAR_W_FRAC = _NAME_FS_MAX * 1.05 / 1080.0  # match renderer's per-char estimate (Orbitron is wide)
 _NAME_BOX_LEFT = 0.040
 _NAME_LEFT = 0.100
 _RANK_X = 0.085
